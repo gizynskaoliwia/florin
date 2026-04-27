@@ -1,0 +1,30 @@
+# Files with personal/financial data
+budżet.xlsx
+odkładanko.xlsx
+
+# Generated icon files (derived from logo2.png)
+logo.ico
+logo.png
+logo2.ico
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Data files (personal monthly data)
+data/
+
+# Config (contains last-used month, window state — personal)
+config.json
+
+# VS Code workspace (IDE-specific, not needed for code)
+*.code-workspace
+
+# Shortcuts (Windows-specific)
+*.lnk
+create_shortcut.ps1
+
+# OS junk
+.DS_Store
+Thumbs.db
