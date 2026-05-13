@@ -117,7 +117,7 @@ class DashboardView(ctk.CTkFrame):
     def refresh(self):
         self.month_lbl.configure(text=f"Month: {self.controller.current_month}")
         data = self.controller.data
-        net = data["business"].get("net_income", 0.0)
+        net = dm.get_net_income(data)
         self.net_income_lbl.configure(text=f"{net:,.2f} PLN".replace(",", " "))
         
         for widget in self.cat_grid.winfo_children():
@@ -149,38 +149,36 @@ class IncomeView(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="transparent")
         self.controller = controller
+        self.editing = False
         
-        ctk.CTkLabel(self, text="Business Income", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 20))
+        # Header with title + edit toggle
+        title_row = ctk.CTkFrame(self, fg_color="transparent")
+        title_row.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(title_row, text="Income", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(side="left")
+        self.edit_btn = ctk.CTkButton(title_row, text="✎ Edit", width=80, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self.toggle_edit)
+        self.edit_btn.pack(side="right")
         
-        card = ctk.CTkFrame(self, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
-        card.pack(fill="x", pady=10)
-        
-        self.vars = {
-            "gross": ctk.StringVar(),
-            "vat": ctk.StringVar(),
-            "tax": ctk.StringVar(),
-            "zus": ctk.StringVar()
-        }
-        
-        fields = [("Gross invoice amount", "gross"), ("VAT deducted", "vat"), ("Income tax deducted", "tax"), ("ZUS deducted", "zus")]
-        
-        for label, key in fields:
-            row = ctk.CTkFrame(card, fg_color="transparent")
-            row.pack(fill="x", padx=20, pady=10)
-            ctk.CTkLabel(row, text=label, font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left")
-            entry = ctk.CTkEntry(row, textvariable=self.vars[key], font=FONT_MONO, text_color=COLOR_TEXT, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER, width=150)
-            entry.pack(side="right")
-            entry.bind("<KeyRelease>", self.calculate)
-            entry.bind("<FocusOut>", lambda e, v=self.vars[key]: self.format_on_blur_money(e, v, self.calculate))
-            
-        sep = ctk.CTkFrame(card, height=1, fg_color=COLOR_BORDER)
-        sep.pack(fill="x", padx=20, pady=10)
-        
-        res_row = ctk.CTkFrame(card, fg_color="transparent")
-        res_row.pack(fill="x", padx=20, pady=(10, 20))
-        ctk.CTkLabel(res_row, text="Net income:", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
-        self.net_lbl = ctk.CTkLabel(res_row, text="0.00 PLN", font=FONT_MONO_LG, text_color=COLOR_INCOME)
+        # Net total summary card
+        total_card = ctk.CTkFrame(self, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
+        total_card.pack(fill="x", pady=(0, 10))
+        total_row = ctk.CTkFrame(total_card, fg_color="transparent")
+        total_row.pack(fill="x", padx=20, pady=15)
+        ctk.CTkLabel(total_row, text="Total Income", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
+        self.net_lbl = ctk.CTkLabel(total_row, text="0.00 PLN", font=FONT_MONO_LG, text_color=COLOR_INCOME)
         self.net_lbl.pack(side="right")
+        
+        # Items list card
+        items_card = ctk.CTkFrame(self, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
+        items_card.pack(fill="both", expand=True, pady=5)
+        
+        hdr = ctk.CTkFrame(items_card, fg_color="transparent")
+        hdr.pack(fill="x", padx=20, pady=(15, 5))
+        ctk.CTkLabel(hdr, text="Items", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
+        self.add_addition_btn = ctk.CTkButton(hdr, text="+ Addition", width=100, fg_color=COLOR_SUCCESS, hover_color="#5A9D7A", command=lambda: self.add_item("addition"))
+        self.add_deduction_btn = ctk.CTkButton(hdr, text="− Deduction", width=100, fg_color=COLOR_ERROR, hover_color="#B05A5A", command=lambda: self.add_item("deduction"))
+        
+        self.items_scroll = ctk.CTkScrollableFrame(items_card, fg_color="transparent")
+        self.items_scroll.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Category Split Section
         self.split_card = ctk.CTkFrame(self, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
@@ -189,8 +187,6 @@ class IncomeView(ctk.CTkFrame):
         header_row = ctk.CTkFrame(self.split_card, fg_color="transparent")
         header_row.pack(fill="x", padx=20, pady=(20, 10))
         ctk.CTkLabel(header_row, text="Category Split", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
-        extra_btn = ctk.CTkButton(header_row, text="+ Extra Income", width=120, command=self.show_extra_income_dialog)
-        extra_btn.pack(side="right", padx=10)
         
         self.sum_warning = ctk.CTkLabel(header_row, text="", font=FONT_BODY, text_color=COLOR_WARNING)
         self.sum_warning.pack(side="right")
@@ -201,10 +197,149 @@ class IncomeView(ctk.CTkFrame):
         self.cat_vars = {}
         self.cat_lbls = {}
         self.cat_built = False
+
+    def toggle_edit(self):
+        self.editing = not self.editing
+        if self.editing:
+            self.edit_btn.configure(text="✓ Done", fg_color=COLOR_PRIMARY, text_color="#FFFFFF", hover_color=COLOR_PRIMARY_HOVER)
+            self.add_addition_btn.pack(side="right", padx=5)
+            self.add_deduction_btn.pack(side="right", padx=5)
+        else:
+            self.edit_btn.configure(text="✎ Edit", fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER)
+            self.add_addition_btn.pack_forget()
+            self.add_deduction_btn.pack_forget()
+        self.build_items_list()
+        self.build_cat_rows()
+        self.calculate_split()
+
+    def add_item(self, item_type):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(f"Add {'Addition' if item_type == 'addition' else 'Deduction'}")
+        dialog.geometry("400x280")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        
+        ctk.CTkLabel(dialog, text="Name:", anchor="w").pack(fill="x", padx=20, pady=(20, 5))
+        name_entry = ctk.CTkEntry(dialog)
+        name_entry.pack(fill="x", padx=20)
+        
+        ctk.CTkLabel(dialog, text="Amount (PLN):", anchor="w").pack(fill="x", padx=20, pady=(10, 5))
+        amt_entry = ctk.CTkEntry(dialog)
+        amt_entry.pack(fill="x", padx=20)
+        
+        cat_var = ctk.StringVar(value="None")
+        if item_type == "addition":
+            ctk.CTkLabel(dialog, text="Target category:", anchor="w").pack(fill="x", padx=20, pady=(10, 5))
+            cats = ["None"] + [c["name"] for c in self.controller.data.get("categories", [])]
+            ctk.CTkOptionMenu(dialog, values=cats, variable=cat_var).pack(fill="x", padx=20)
+        
+        def save():
+            try:
+                amt = float(amt_entry.get().replace(",", "."))
+                name = name_entry.get().strip()
+                if not name or amt <= 0:
+                    return
+                cat_id = None
+                if cat_var.get() != "None":
+                    cat_id = next((c["id"] for c in self.controller.data.get("categories", []) if c["name"] == cat_var.get()), None)
+                item = {"id": dm.generate_id(), "name": name, "amount": amt, "type": item_type, "category_id": cat_id}
+                self.controller.data.setdefault("income_items", []).append(item)
+                self.controller.save_data()
+                dialog.destroy()
+                self.refresh()
+            except:
+                pass
+        
+        ctk.CTkButton(dialog, text="Save", command=save).pack(pady=20)
+
+    def edit_item(self, item_id):
+        item = next((i for i in self.controller.data.get("income_items", []) if i["id"] == item_id), None)
+        if not item:
+            return
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Edit Item")
+        dialog.geometry("400x280")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        
+        ctk.CTkLabel(dialog, text="Name:", anchor="w").pack(fill="x", padx=20, pady=(20, 5))
+        name_entry = ctk.CTkEntry(dialog)
+        name_entry.insert(0, item["name"])
+        name_entry.pack(fill="x", padx=20)
+        
+        ctk.CTkLabel(dialog, text="Amount (PLN):", anchor="w").pack(fill="x", padx=20, pady=(10, 5))
+        amt_entry = ctk.CTkEntry(dialog)
+        amt_entry.insert(0, str(item["amount"]))
+        amt_entry.pack(fill="x", padx=20)
+        
+        cat_var = ctk.StringVar(value="None")
+        if item["type"] == "addition":
+            ctk.CTkLabel(dialog, text="Target category:", anchor="w").pack(fill="x", padx=20, pady=(10, 5))
+            cats = ["None"] + [c["name"] for c in self.controller.data.get("categories", [])]
+            cur_cat = next((c["name"] for c in self.controller.data.get("categories", []) if c["id"] == item.get("category_id")), "None")
+            cat_var.set(cur_cat)
+            ctk.CTkOptionMenu(dialog, values=cats, variable=cat_var).pack(fill="x", padx=20)
+        
+        def save():
+            try:
+                amt = float(amt_entry.get().replace(",", "."))
+                name = name_entry.get().strip()
+                if not name or amt <= 0:
+                    return
+                item["name"] = name
+                item["amount"] = amt
+                if item["type"] == "addition":
+                    item["category_id"] = next((c["id"] for c in self.controller.data.get("categories", []) if c["name"] == cat_var.get()), None)
+                self.controller.save_data()
+                dialog.destroy()
+                self.refresh()
+            except:
+                pass
+        
+        ctk.CTkButton(dialog, text="Save", command=save).pack(pady=20)
+
+    def delete_item(self, item_id):
+        self.controller.data["income_items"] = [i for i in self.controller.data.get("income_items", []) if i["id"] != item_id]
+        self.controller.save_data()
+        self.refresh()
+
+    def build_items_list(self):
+        for w in self.items_scroll.winfo_children():
+            w.destroy()
+        
+        items = self.controller.data.get("income_items", [])
+        cats = {c["id"]: c for c in self.controller.data.get("categories", [])}
+        
+        for item in items:
+            is_add = item["type"] == "addition"
+            row_color = "#E8F5E9" if is_add else "#FFEBEE"
+            row = ctk.CTkFrame(self.items_scroll, fg_color=row_color, corner_radius=8)
+            row.pack(fill="x", pady=2)
+            
+            sign = "+" if is_add else "−"
+            sign_color = COLOR_SUCCESS if is_add else COLOR_ERROR
+            ctk.CTkLabel(row, text=sign, font=FONT_MONO_LG, text_color=sign_color, width=24).pack(side="left", padx=(10, 5), pady=8)
+            ctk.CTkLabel(row, text=item["name"], font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=5, pady=8)
+            
+            # Category badge
+            cat_id = item.get("category_id")
+            if cat_id and cat_id in cats:
+                badge = ctk.CTkLabel(row, text=cats[cat_id]["name"], font=FONT_SMALL, text_color="#FFFFFF", fg_color=cats[cat_id].get("color", COLOR_PRIMARY), corner_radius=6, width=70)
+                badge.pack(side="left", padx=10, pady=8)
+            
+            if self.editing:
+                ctk.CTkButton(row, text="🗑", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda iid=item["id"]: self.delete_item(iid)).pack(side="right", padx=5, pady=8)
+                ctk.CTkButton(row, text="✎", width=28, height=28, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=lambda iid=item["id"]: self.edit_item(iid)).pack(side="right", padx=2, pady=8)
+            
+            # Amount
+            amt_text = f"{sign} {item['amount']:,.2f} PLN".replace(",", " ")
+            ctk.CTkLabel(row, text=amt_text, font=FONT_MONO, text_color=sign_color).pack(side="right", padx=10, pady=8)
         
     def build_cat_rows(self):
         for widget in self.cat_rows_frame.winfo_children():
             widget.destroy()
+        self.cat_vars = {}
+        self.cat_lbls = {}
             
         data = self.controller.data
         cats = data.get("categories", [])
@@ -218,44 +353,39 @@ class IncomeView(ctk.CTkFrame):
             var = ctk.StringVar(value=str(cat["percent"]))
             self.cat_vars[cat["id"]] = var
             
-            entry = ctk.CTkEntry(row, textvariable=var, font=FONT_MONO, text_color=COLOR_TEXT, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER, width=60)
-            entry.pack(side="left", padx=10)
-            ctk.CTkLabel(row, text="%", font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(side="left")
-            
-            entry.bind("<KeyRelease>", self.calculate_split)
-            entry.bind("<FocusOut>", lambda e, v=var: self.format_on_blur_pct(e, v, self.calculate_split))
+            if self.editing:
+                entry = ctk.CTkEntry(row, textvariable=var, font=FONT_MONO, text_color=COLOR_TEXT, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER, width=60)
+                entry.pack(side="left", padx=10)
+                ctk.CTkLabel(row, text="%", font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(side="left")
+                entry.bind("<KeyRelease>", self.calculate_split)
+                entry.bind("<FocusOut>", lambda e, v=var: self.format_on_blur_pct(e, v))
+                del_btn = ctk.CTkButton(row, text="×", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_SURFACE_2, command=lambda cid=cat["id"]: self.delete_category(cid))
+                del_btn.pack(side="right")
+            else:
+                ctk.CTkLabel(row, text=f"{cat['percent']:.1f}%", font=FONT_MONO, text_color=COLOR_TEXT_MUTED).pack(side="left", padx=10)
             
             lbl = ctk.CTkLabel(row, text="0.00 PLN", font=FONT_MONO, text_color=cat.get("color", COLOR_PRIMARY))
             lbl.pack(side="right", padx=(10, 0))
-            
-            del_btn = ctk.CTkButton(row, text="×", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_SURFACE_2, command=lambda cid=cat["id"]: self.delete_category(cid))
-            del_btn.pack(side="right")
-            
             self.cat_lbls[cat["id"]] = lbl
-            
-        add_btn = ctk.CTkButton(self.cat_rows_frame, text="+ Add Category", fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_SURFACE_2, command=self.add_category)
-        add_btn.pack(anchor="w", pady=(10, 0))
+        
+        if self.editing:
+            add_btn = ctk.CTkButton(self.cat_rows_frame, text="+ Add Category", fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_SURFACE_2, command=self.add_category)
+            add_btn.pack(anchor="w", pady=(10, 0))
         self.cat_built = True
 
-    def format_on_blur_pct(self, event, var, callback):
+    def format_on_blur_pct(self, event, var):
         val = var.get()
         if val:
             try:
                 var.set(f"{float(val):.1f}")
-                callback()
-            except: pass
-
-    def format_on_blur_money(self, event, var, callback):
-        val = var.get()
-        if val:
-            try:
-                var.set(f"{float(val):.2f}")
-                callback()
-            except: pass
+                self.calculate_split()
+            except:
+                pass
 
     def delete_category(self, cat_id):
         cats = self.controller.data.get("categories", [])
-        if len(cats) <= 2: return
+        if len(cats) <= 2:
+            return
         self.controller.data["categories"] = [c for c in cats if c["id"] != cat_id]
         self.build_cat_rows()
         self.calculate_split()
@@ -271,250 +401,344 @@ class IncomeView(ctk.CTkFrame):
             self.calculate_split()
             self.controller.save_data()
 
-    def show_extra_income_dialog(self):
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Add Extra Income")
-        dialog.geometry("400x350")
-        dialog.transient(self.winfo_toplevel())
-        dialog.grab_set()
-        
-        ctk.CTkLabel(dialog, text="Amount (PLN):", anchor="w").pack(fill="x", padx=20, pady=(20, 5))
-        amt_entry = ctk.CTkEntry(dialog)
-        amt_entry.pack(fill="x", padx=20)
-        
-        ctk.CTkLabel(dialog, text="Description:", anchor="w").pack(fill="x", padx=20, pady=(10, 5))
-        desc_entry = ctk.CTkEntry(dialog)
-        desc_entry.pack(fill="x", padx=20)
-        
-        ctk.CTkLabel(dialog, text="Target:", anchor="w").pack(fill="x", padx=20, pady=(10, 5))
-        cats = ["All categories proportionally"] + [c["name"] for c in self.controller.data.get("categories", [])]
-        cat_menu = ctk.CTkOptionMenu(dialog, values=cats)
-        cat_menu.pack(fill="x", padx=20)
-        
-        def save():
-            try:
-                amt = float(amt_entry.get().replace(",", "."))
-                desc = desc_entry.get()
-                if not desc or amt <= 0: return
-                
-                target = None
-                sel_cat = cat_menu.get()
-                if sel_cat != "All categories proportionally":
-                    target = next((c["id"] for c in self.controller.data.get("categories", []) if c["name"] == sel_cat), None)
-                
-                new_inc = {
-                    "id": dm.generate_id(),
-                    "amount": amt,
-                    "description": desc,
-                    "target_category": target,
-                    "date": datetime.now().strftime("%Y-%m-%d")
-                }
-                self.controller.data.setdefault("additional_income", []).append(new_inc)
-                self.controller.save_data()
-                dialog.destroy()
-            except: pass
-            
-        btn = ctk.CTkButton(dialog, text="Save", command=save)
-        btn.pack(pady=20)
-        
     def calculate_split(self, event=None):
         try:
             total_pct = 0.0
             parsed_pcts = {}
             for cat_id, v in self.cat_vars.items():
-                val_str = v.get()
-                clean_str = "".join(c for c in val_str.replace(",", ".") if c.isdigit() or c == ".")
-                parts = clean_str.split(".")
-                if len(parts) > 2:
-                    clean_str = parts[0] + "." + "".join(parts[1:])
-                if clean_str != val_str:
-                    v.set(clean_str)
-                    val_str = clean_str
-                pct = float(val_str) if val_str else 0.0
+                val_str = v.get().replace(",", ".")
+                clean_str = "".join(c for c in val_str if c.isdigit() or c == ".")
+                pct = float(clean_str) if clean_str else 0.0
                 parsed_pcts[cat_id] = pct
                 total_pct += pct
                 
             if abs(total_pct - 100.0) > 0.01:
-                self.sum_warning.configure(text=f"Warning: Sum is {total_pct}% (must be 100%)")
-                # Do not save if it doesn't sum to 100%
+                self.sum_warning.configure(text=f"Warning: Sum is {total_pct:.1f}% (must be 100%)")
             else:
                 self.sum_warning.configure(text="")
                 
-            net = self.controller.data["business"].get("net_income", 0.0)
+            net = dm.get_net_income(self.controller.data)
+            # General net excludes category-targeted additions
+            cat_targeted = sum(i["amount"] for i in self.controller.data.get("income_items", []) if i.get("category_id") and i["type"] == "addition")
+            general_net = net - cat_targeted
+            
             for cat in self.controller.data.get("categories", []):
                 if cat["id"] in parsed_pcts:
                     new_pct = parsed_pcts[cat["id"]]
                     cat["percent"] = new_pct
-                    amt = net * (new_pct / 100.0)
+                    amt = general_net * (new_pct / 100.0)
+                    # Add category-specific extras
+                    amt += sum(i["amount"] for i in self.controller.data.get("income_items", []) if i.get("category_id") == cat["id"] and i["type"] == "addition")
                     self.cat_lbls[cat["id"]].configure(text=f"{amt:,.2f} PLN".replace(",", " "))
                     
             if abs(total_pct - 100.0) <= 0.01:
                 self.controller.save_data()
-        except Exception as e:
-            pass
-
-    def calculate(self, event=None):
-        try:
-            def parse_val(v):
-                s = v.get()
-                clean_s = "".join(c for c in s.replace(",", ".") if c.isdigit() or c == ".")
-                parts = clean_s.split(".")
-                if len(parts) > 2:
-                    clean_s = parts[0] + "." + "".join(parts[1:])
-                if clean_s != s:
-                    v.set(clean_s)
-                    s = clean_s
-                return float(s) if s else 0.0
-                
-            gross = parse_val(self.vars["gross"])
-            vat = parse_val(self.vars["vat"])
-            tax = parse_val(self.vars["tax"])
-            zus = parse_val(self.vars["zus"])
-            net = gross - vat - tax - zus
-            
-            self.net_lbl.configure(text=f"{net:,.2f} PLN".replace(",", " "))
-            
-            b = self.controller.data["business"]
-            b["gross_invoice"] = gross
-            b["vat_deducted"] = vat
-            b["income_tax_deducted"] = tax
-            b["zus_deducted"] = zus
-            b["net_income"] = net
-            
-            self.calculate_split() # update split labels with new net income
         except:
             pass
 
     def refresh(self):
         if not self.cat_built:
             self.build_cat_rows()
-            
-        b = self.controller.data["business"]
-        self.vars["gross"].set(str(b.get("gross_invoice", 0.0)))
-        self.vars["vat"].set(str(b.get("vat_deducted", 0.0)))
-        self.vars["tax"].set(str(b.get("income_tax_deducted", 0.0)))
-        self.vars["zus"].set(str(b.get("zus_deducted", 0.0)))
-        self.calculate()
+        self.build_items_list()
+        net = dm.get_net_income(self.controller.data)
+        self.net_lbl.configure(text=f"{net:,.2f} PLN".replace(",", " "))
+        self.calculate_split()
 
 class ExpensesView(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="transparent")
         self.controller = controller
-        ctk.CTkLabel(self, text="Expenses", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 10))
-        
-        self.cat_strip = ctk.CTkFrame(self, fg_color="transparent")
-        self.cat_strip.pack(fill="x", pady=10)
-        
-        bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
-        bottom_frame.pack(fill="both", expand=True)
-        bottom_frame.grid_columnconfigure(0, weight=2)
-        bottom_frame.grid_columnconfigure(1, weight=1)
-        bottom_frame.grid_rowconfigure(0, weight=1)
-        
-        list_card = ctk.CTkFrame(bottom_frame, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
-        list_card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        ctk.CTkLabel(list_card, text="Expense List", font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w", padx=20, pady=20)
-        
-        self.scroll_list = ctk.CTkScrollableFrame(list_card, fg_color="transparent")
-        self.scroll_list.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        form_card = ctk.CTkFrame(bottom_frame, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
-        form_card.grid(row=0, column=1, sticky="nsew")
-        ctk.CTkLabel(form_card, text="Add Expense", font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w", padx=20, pady=20)
-        
-        self.f_date = ctk.CTkEntry(form_card, placeholder_text="DD/MM/YYYY", fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER)
-        self.f_date.pack(fill="x", padx=20, pady=5)
-        self.f_amount_var = ctk.StringVar()
-        self.f_amount = ctk.CTkEntry(form_card, textvariable=self.f_amount_var, placeholder_text="Amount (PLN)", fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER)
-        self.f_amount.pack(fill="x", padx=20, pady=5)
-        self.f_amount.bind("<KeyRelease>", self.format_amount)
-        self.f_amount.bind("<FocusOut>", lambda e: self.format_on_blur_amount())
-        self.f_desc = ctk.CTkEntry(form_card, placeholder_text="Description", fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER)
-        self.f_desc.pack(fill="x", padx=20, pady=5)
-        
-        self.f_cat = ctk.CTkOptionMenu(form_card, values=[], fg_color=COLOR_SURFACE_2, button_color=COLOR_PRIMARY, text_color=COLOR_TEXT)
-        self.f_cat.pack(fill="x", padx=20, pady=5)
-        
-        btn = ctk.CTkButton(form_card, text="Add Expense", command=self.add_expense)
-        btn.pack(fill="x", padx=20, pady=20)
-        
-    def format_amount(self, event=None):
-        val = self.f_amount_var.get()
-        clean_val = "".join(c for c in val.replace(",", ".") if c.isdigit() or c == ".")
-        parts = clean_val.split(".")
-        if len(parts) > 2:
-            clean_val = parts[0] + "." + "".join(parts[1:])
-        if clean_val != val:
-            self.f_amount_var.set(clean_val)
-            
-    def format_on_blur_amount(self):
-        val = self.f_amount_var.get()
-        if val:
+
+        # Header row
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header, text="Expenses", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(side="left")
+        ctk.CTkButton(header, text="⚙ Categories", width=120, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self.open_category_manager).pack(side="right", padx=5)
+        ctk.CTkButton(header, text="+ Add Expense", width=120, fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER, command=self.open_add_expense).pack(side="right", padx=5)
+
+        # Split bucket summary strip
+        self.split_strip = ctk.CTkFrame(self, fg_color="transparent")
+        self.split_strip.pack(fill="x", pady=(0, 5))
+
+        # Tag filter bar
+        self.tag_bar = ctk.CTkFrame(self, fg_color="transparent")
+        self.tag_bar.pack(fill="x", pady=(0, 10))
+        self.active_tag = None  # None = no filter
+        self.expanded_cats = {}  # cat_id -> bool, tracks accordion state
+
+        # Main content: scrollable table grouped by expense category
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
+    # --- Add Expense Dialog ---
+    def open_add_expense(self, edit_exp=None):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Edit Expense" if edit_exp else "Add Expense")
+        dialog.geometry("440x420")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        data = self.controller.data
+
+        ctk.CTkLabel(dialog, text="Date (DD/MM/YYYY):", anchor="w").pack(fill="x", padx=20, pady=(15, 3))
+        date_entry = ctk.CTkEntry(dialog)
+        date_entry.pack(fill="x", padx=20)
+        date_entry.insert(0, edit_exp["date"] if edit_exp else datetime.now().strftime("%d/%m/%Y"))
+
+        ctk.CTkLabel(dialog, text="Amount (PLN):", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
+        amt_entry = ctk.CTkEntry(dialog)
+        amt_entry.pack(fill="x", padx=20)
+        if edit_exp:
+            amt_entry.insert(0, f"{edit_exp['amount']:.2f}")
+
+        ctk.CTkLabel(dialog, text="Expense Category:", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
+        exp_cats = dm.get_expense_categories(data)
+        exp_cat_names = [c["name"] for c in exp_cats] or ["(none)"]
+        exp_cat_var = ctk.StringVar(value=exp_cat_names[0])
+        if edit_exp:
+            cur = next((c["name"] for c in exp_cats if c["id"] == edit_exp.get("expense_category_id")), exp_cat_names[0])
+            exp_cat_var.set(cur)
+        ctk.CTkOptionMenu(dialog, values=exp_cat_names, variable=exp_cat_var).pack(fill="x", padx=20)
+
+        ctk.CTkLabel(dialog, text="Income Split Bucket:", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
+        split_cats = data.get("categories", [])
+        split_names = [c["name"] for c in split_cats] or ["(none)"]
+        split_var = ctk.StringVar(value=split_names[0])
+        if edit_exp:
+            cur_split = next((c["name"] for c in split_cats if c["id"] == edit_exp.get("category_id")), split_names[0])
+            split_var.set(cur_split)
+        ctk.CTkOptionMenu(dialog, values=split_names, variable=split_var).pack(fill="x", padx=20)
+
+        ctk.CTkLabel(dialog, text="Description (optional):", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
+        desc_entry = ctk.CTkEntry(dialog)
+        desc_entry.pack(fill="x", padx=20)
+        if edit_exp:
+            desc_entry.insert(0, edit_exp.get("description", ""))
+
+        ctk.CTkLabel(dialog, text="Tags (comma-separated, optional):", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
+        tags_entry = ctk.CTkEntry(dialog)
+        tags_entry.pack(fill="x", padx=20)
+        if edit_exp:
+            tags_entry.insert(0, ", ".join(edit_exp.get("tags", [])))
+
+        def save():
             try:
-                self.f_amount_var.set(f"{float(val):.2f}")
-            except: pass
+                amt = float(amt_entry.get().replace(",", "."))
+                if amt <= 0:
+                    return
+            except:
+                return
+            date_val = date_entry.get().strip() or datetime.now().strftime("%d/%m/%Y")
+            exp_cat_id = next((c["id"] for c in exp_cats if c["name"] == exp_cat_var.get()), None)
+            split_id = next((c["id"] for c in split_cats if c["name"] == split_var.get()), None)
+            desc = desc_entry.get().strip()
+            tags = [t.strip() for t in tags_entry.get().split(",") if t.strip()]
 
-    def add_expense(self):
-        try:
-            amt = float(self.f_amount.get().replace(",", "."))
-            desc = self.f_desc.get()
-            if not desc or amt <= 0: return
-            
-            cat_name = self.f_cat.get()
-            cat_id = next((c["id"] for c in self.controller.data.get("categories", []) if c["name"] == cat_name), "daily_life")
-            
-            new_exp = {
-                "id": dm.generate_id(),
-                "date": self.f_date.get() or datetime.now().strftime("%d/%m/%Y"),
-                "amount": amt,
-                "description": desc,
-                "category_id": cat_id,
-            }
-            self.controller.data.setdefault("expenses", []).append(new_exp)
+            if edit_exp:
+                dm.edit_expense(data, edit_exp["id"], date=date_val, amount=amt, expense_category_id=exp_cat_id, category_id=split_id, description=desc, tags=tags)
+            else:
+                dm.add_expense(data, date_val, amt, split_id, expense_category_id=exp_cat_id, description=desc, tags=tags)
             self.controller.save_data()
-            
-            self.f_amount.delete(0, 'end')
-            self.f_desc.delete(0, 'end')
+            dialog.destroy()
             self.refresh()
-        except:
-            pass
 
+        ctk.CTkButton(dialog, text="Save", command=save).pack(fill="x", padx=20, pady=15)
+
+    # --- Category Manager Dialog ---
+    def open_category_manager(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Expense Categories")
+        dialog.geometry("400x450")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        data = self.controller.data
+
+        list_frame = ctk.CTkScrollableFrame(dialog, fg_color="transparent")
+        list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        def rebuild():
+            for w in list_frame.winfo_children():
+                w.destroy()
+            for cat in dm.get_expense_categories(data):
+                row = ctk.CTkFrame(list_frame, fg_color=COLOR_SURFACE_2, corner_radius=8)
+                row.pack(fill="x", pady=2)
+                ctk.CTkLabel(row, text=cat["name"], font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=10, pady=8)
+                ctk.CTkButton(row, text="🗑", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda cid=cat["id"]: do_delete(cid)).pack(side="right", padx=5, pady=5)
+                ctk.CTkButton(row, text="✎", width=28, height=28, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=lambda cid=cat["id"], cn=cat["name"]: do_edit(cid, cn)).pack(side="right", padx=2, pady=5)
+
+        def do_delete(cid):
+            dm.delete_expense_category(data, cid)
+            self.controller.save_data()
+            rebuild()
+
+        def do_edit(cid, current_name):
+            d = ctk.CTkInputDialog(text="New name:", title="Rename Category")
+            new_name = d.get_input()
+            if new_name and new_name.strip():
+                dm.edit_expense_category(data, cid, new_name.strip())
+                self.controller.save_data()
+                rebuild()
+
+        rebuild()
+
+        # Add new category
+        add_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        add_frame.pack(fill="x", padx=10, pady=10)
+        new_entry = ctk.CTkEntry(add_frame, placeholder_text="New category name")
+        new_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+
+        def do_add():
+            name = new_entry.get().strip()
+            if name:
+                dm.add_expense_category(data, name)
+                self.controller.save_data()
+                new_entry.delete(0, "end")
+                rebuild()
+
+        ctk.CTkButton(add_frame, text="Add", width=60, command=do_add).pack(side="right")
+
+    # --- Accordion toggle ---
+    def toggle_category(self, cat_id):
+        self.expanded_cats[cat_id] = not self.expanded_cats.get(cat_id, False)
+        self.refresh()
+
+    # --- Tag filter ---
+    def set_tag_filter(self, tag):
+        if self.active_tag == tag:
+            self.active_tag = None
+        else:
+            self.active_tag = tag
+        self.refresh()
+
+    # --- Delete expense ---
     def delete_expense(self, exp_id):
-        self.controller.data["expenses"] = [e for e in self.controller.data.get("expenses", []) if e["id"] != exp_id]
+        dm.delete_expense(self.controller.data, exp_id)
         self.controller.save_data()
         self.refresh()
 
+    # --- Refresh / Build Table ---
     def refresh(self):
         data = self.controller.data
-        cat_names = [c["name"] for c in data.get("categories", [])]
-        if cat_names:
-            self.f_cat.configure(values=cat_names)
-            if not self.f_cat.get(): self.f_cat.set(cat_names[0])
-            
-        for w in self.cat_strip.winfo_children():
+
+        # Ensure expense_categories exist (migration for old data)
+        if "expense_categories" not in data:
+            data["expense_categories"] = list(dm.DEFAULT_EXPENSE_CATEGORIES)
+
+        # Split bucket summary strip
+        for w in self.split_strip.winfo_children():
             w.destroy()
-            
         for cat in data.get("categories", []):
-            c_frame = ctk.CTkFrame(self.cat_strip, fg_color=COLOR_SURFACE, corner_radius=10, border_width=1, border_color=COLOR_BORDER)
-            c_frame.pack(side="left", fill="both", expand=True, padx=5)
-            rem = dm.get_remaining_amount(data, cat["id"])
-            ctk.CTkLabel(c_frame, text=f"{cat['name']}\n{rem:,.2f} PLN", font=FONT_BODY, text_color=COLOR_TEXT).pack(pady=10)
-            
-        for w in self.scroll_list.winfo_children():
+            allocated = dm.get_allocated_amount(data, cat["id"])
+            spent = dm.get_spent_amount(data, cat["id"])
+            rem = allocated - spent
+            color = COLOR_SUCCESS if rem >= 0 else COLOR_ERROR
+            pill = ctk.CTkFrame(self.split_strip, fg_color=COLOR_SURFACE, corner_radius=10, border_width=1, border_color=COLOR_BORDER)
+            pill.pack(side="left", fill="both", expand=True, padx=3)
+            ctk.CTkLabel(pill, text=cat["name"], font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(pady=(8, 0))
+            ctk.CTkLabel(pill, text=f"{rem:,.2f} PLN", font=FONT_MONO, text_color=color).pack(pady=(0, 8))
+
+        # Build tag bar
+        for w in self.tag_bar.winfo_children():
             w.destroy()
-            
-        for exp in reversed(data.get("expenses", [])):
-            row = ctk.CTkFrame(self.scroll_list, fg_color=COLOR_SURFACE_2, corner_radius=8)
-            row.pack(fill="x", pady=2)
-            
-            lbl_text = f"{exp.get('date', '')} | {exp.get('description', '')}"
-            ctk.CTkLabel(row, text=lbl_text, font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=10, pady=5)
-            
-            del_btn = ctk.CTkButton(row, text="🗑", width=30, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda eid=exp["id"]: self.delete_expense(eid))
-            del_btn.pack(side="right", padx=5)
-            
-            amt_text = f"{exp.get('amount', 0):,.2f} PLN"
-            ctk.CTkLabel(row, text=amt_text, font=FONT_MONO, text_color=COLOR_EXPENSE).pack(side="right", padx=10)
+        all_tags = set()
+        for exp in data.get("expenses", []):
+            for t in exp.get("tags", []):
+                all_tags.add(t)
+        if all_tags:
+            ctk.CTkLabel(self.tag_bar, text="Tags:", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="left", padx=(0, 5))
+            for tag in sorted(all_tags):
+                is_active = self.active_tag == tag
+                btn_fg = COLOR_PRIMARY if is_active else COLOR_SURFACE_2
+                btn_text_color = "#FFFFFF" if is_active else COLOR_TEXT
+                btn = ctk.CTkButton(self.tag_bar, text=tag, height=24, width=len(tag)*8+20, font=FONT_SMALL, fg_color=btn_fg, text_color=btn_text_color, hover_color=COLOR_PRIMARY_HOVER if is_active else COLOR_BORDER, corner_radius=12, command=lambda t=tag: self.set_tag_filter(t))
+                btn.pack(side="left", padx=2)
+            if self.active_tag:
+                ctk.CTkButton(self.tag_bar, text="✕ Clear", height=24, width=60, font=FONT_SMALL, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda: self.set_tag_filter(self.active_tag)).pack(side="left", padx=5)
+
+        # Table content
+        for w in self.scroll.winfo_children():
+            w.destroy()
+
+        split_cats = {c["id"]: c["name"] for c in data.get("categories", [])}
+
+        # If tag filter active: show flat list of matching expenses + total
+        if self.active_tag:
+            filtered = [e for e in data.get("expenses", []) if self.active_tag in e.get("tags", [])]
+            total = sum(e["amount"] for e in filtered)
+
+            hdr = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=12, border_width=1, border_color=COLOR_BORDER)
+            hdr.pack(fill="x", pady=(5, 5))
+            ctk.CTkLabel(hdr, text=f"  Tag: \"{self.active_tag}\" ({len(filtered)} expenses)", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left", padx=10, pady=8)
+            ctk.CTkLabel(hdr, text=f"Total: {total:,.2f} PLN  ", font=FONT_MONO, text_color=COLOR_EXPENSE).pack(side="right", padx=10, pady=8)
+
+            for exp in sorted(filtered, key=lambda e: e.get("date", ""), reverse=True):
+                row = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE_2, corner_radius=8)
+                row.pack(fill="x", pady=1, padx=10)
+                date_txt = exp.get("date", "")
+                desc_txt = exp.get("description", "")
+                tags = exp.get("tags", [])
+                split_name = split_cats.get(exp.get("category_id", ""), "?")
+                left_text = f"{date_txt}  {desc_txt}"
+                if tags:
+                    left_text += f"  [{', '.join(tags)}]"
+                ctk.CTkLabel(row, text=left_text, font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=10, pady=5)
+                ctk.CTkButton(row, text="🗑", width=26, height=26, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda eid=exp["id"]: self.delete_expense(eid)).pack(side="right", padx=3, pady=3)
+                ctk.CTkButton(row, text="✎", width=26, height=26, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=lambda e=exp: self.open_add_expense(edit_exp=e)).pack(side="right", padx=1, pady=3)
+                ctk.CTkLabel(row, text=f"{exp['amount']:,.2f}", font=FONT_MONO, text_color=COLOR_EXPENSE).pack(side="right", padx=5, pady=5)
+                ctk.CTkLabel(row, text=split_name, font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="right", padx=5, pady=5)
+            return
+
+        # Default: grouped by expense category (accordion)
+        grouped = dm.get_expenses_by_expense_category(data)
+        exp_cats = {c["id"]: c["name"] for c in dm.get_expense_categories(data)}
+
+        cat_order = list(exp_cats.keys())
+        if "uncategorized" in grouped and "uncategorized" not in cat_order:
+            cat_order.append("uncategorized")
+
+        for cat_id in cat_order:
+            expenses = grouped.get(cat_id, [])
+            if not expenses:
+                continue
+            cat_name = exp_cats.get(cat_id, "Uncategorized")
+            total = sum(e["amount"] for e in expenses)
+            is_expanded = self.expanded_cats.get(cat_id, False)
+            chevron = "▲" if is_expanded else "▼"
+
+            # Clickable header
+            hdr = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=12, border_width=1, border_color=COLOR_BORDER, cursor="hand2")
+            hdr.pack(fill="x", pady=(10, 2))
+            ctk.CTkLabel(hdr, text=f"  {chevron}  {cat_name}", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left", padx=10, pady=8)
+            ctk.CTkLabel(hdr, text=f"Total: {total:,.2f} PLN  ", font=FONT_MONO, text_color=COLOR_EXPENSE).pack(side="right", padx=10, pady=8)
+            # Bind click on header and all children
+            hdr.bind("<Button-1>", lambda e, cid=cat_id: self.toggle_category(cid))
+            for child in hdr.winfo_children():
+                child.bind("<Button-1>", lambda e, cid=cat_id: self.toggle_category(cid))
+
+            # Split breakdown (always visible)
+            breakdown = dm.get_expense_category_split_breakdown(data, cat_id)
+            if breakdown:
+                parts = [f"{split_cats.get(sid, sid)}: {amt:,.2f}" for sid, amt in breakdown.items()]
+                bd_text = "    ↳ " + " · ".join(parts)
+                ctk.CTkLabel(self.scroll, text=bd_text, font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, anchor="w").pack(fill="x", padx=15, pady=(0, 4))
+
+            # Expense rows (only when expanded)
+            if is_expanded:
+                for exp in sorted(expenses, key=lambda e: e.get("date", ""), reverse=True):
+                    row = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE_2, corner_radius=8)
+                    row.pack(fill="x", pady=1, padx=10)
+                    date_txt = exp.get("date", "")
+                    desc_txt = exp.get("description", "")
+                    tags = exp.get("tags", [])
+                    split_name = split_cats.get(exp.get("category_id", ""), "?")
+                    left_text = f"{date_txt}  {desc_txt}"
+                    if tags:
+                        left_text += f"  [{', '.join(tags)}]"
+                    ctk.CTkLabel(row, text=left_text, font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=10, pady=5)
+                    ctk.CTkButton(row, text="🗑", width=26, height=26, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda eid=exp["id"]: self.delete_expense(eid)).pack(side="right", padx=3, pady=3)
+                    ctk.CTkButton(row, text="✎", width=26, height=26, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=lambda e=exp: self.open_add_expense(edit_exp=e)).pack(side="right", padx=1, pady=3)
+                    ctk.CTkLabel(row, text=f"{exp['amount']:,.2f}", font=FONT_MONO, text_color=COLOR_EXPENSE).pack(side="right", padx=5, pady=5)
+                    ctk.CTkLabel(row, text=split_name, font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="right", padx=5, pady=5)
 
 class CashFlowView(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -613,7 +837,7 @@ class CashFlowView(ctk.CTkFrame):
                 total_topup += topup
                 self.topup_lbls[cat_id].configure(text=f"{topup:,.2f} PLN".replace(",", " "))
                 
-            net_income = self.controller.data.get("business", {}).get("net_income", 0.0)
+            net_income = dm.get_net_income(self.controller.data)
             rem = net_income - total_topup
             
             self.tot_topup_lbl.configure(text=f"Total to top up: {total_topup:,.2f} PLN".replace(",", " "))
