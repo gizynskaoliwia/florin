@@ -21,11 +21,11 @@ def init_env():
                 "tax": 0.0,
                 "zus": 0.0
             },
-            "buffer_minimums": {
-                "daily_life": 2000.0,
-                "pleasure": 1100.0,
-                "business_expenses": 2760.0
-            }
+            "cashflow_targets": [
+                {"id": "daily_life", "name": "Daily Life", "target": 2000.0},
+                {"id": "pleasure", "name": "Pleasure", "target": 1100.0},
+                {"id": "business_expenses", "name": "Business Fees", "target": 2760.0}
+            ]
         })
 
 def get_config():
@@ -50,17 +50,11 @@ def generate_default_month(month_str):
         ],
         "expense_categories": list(DEFAULT_EXPENSE_CATEGORIES),
         "expenses": [],
-        "cashflow_buffer": {
-            "minimums": config.get("buffer_minimums", {
-                "daily_life": 2000.0,
-                "pleasure": 1100.0,
-                "business_expenses": 2760.0
-            }),
-            "current_on_account": {
-                "daily_life": 0.0,
-                "pleasure": 0.0,
-                "business_expenses": 0.0
-            }
+        "cashflow": {
+            "current_accounts": {},  # {target_id: {"balance": 0.0, "updated_at": ""}}
+            "shared_actual": 0.0,
+            "shared_assumed": 0.0,
+            "saved_assumed": 0.0,
         }
     }
 
@@ -106,6 +100,41 @@ def save_month(month_str, data):
 
 def generate_id():
     return str(uuid.uuid4())
+
+# --- Cashflow Targets (config-level) ---
+def get_cashflow_targets(config=None):
+    if config is None:
+        config = get_config()
+    return config.get("cashflow_targets", [])
+
+def add_cashflow_target(name, target_amount):
+    config = get_config()
+    targets = config.setdefault("cashflow_targets", [])
+    t = {"id": generate_id(), "name": name, "target": target_amount}
+    targets.append(t)
+    save_config(config)
+    return t
+
+def edit_cashflow_target(target_id, name=None, target_amount=None):
+    config = get_config()
+    for t in config.get("cashflow_targets", []):
+        if t["id"] == target_id:
+            if name is not None:
+                t["name"] = name
+            if target_amount is not None:
+                t["target"] = target_amount
+            save_config(config)
+            return t
+    return None
+
+def delete_cashflow_target(target_id):
+    config = get_config()
+    config["cashflow_targets"] = [t for t in config.get("cashflow_targets", []) if t["id"] != target_id]
+    save_config(config)
+
+# --- Cashflow monthly helpers ---
+def get_cashflow(data):
+    return data.setdefault("cashflow", {"current_accounts": {}, "shared_actual": 0.0, "shared_assumed": 0.0, "saved_assumed": 0.0})
 
 def load_xlsx(filepath: str, password: str = None, sheet_name: str = "kwiecień 2026") -> dict:
     try:

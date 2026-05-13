@@ -744,125 +744,231 @@ class CashFlowView(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="transparent")
         self.controller = controller
-        ctk.CTkLabel(self, text="Cash Flow Buffer", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 20))
-        
-        self.card = ctk.CTkFrame(self, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
-        self.card.pack(fill="x", pady=10)
-        
-        self.rows_frame = ctk.CTkFrame(self.card, fg_color="transparent")
-        self.rows_frame.pack(fill="x", padx=20, pady=20)
-        
-        sep = ctk.CTkFrame(self.card, height=1, fg_color=COLOR_BORDER)
-        sep.pack(fill="x", padx=20)
-        
-        self.summary_frame = ctk.CTkFrame(self.card, fg_color="transparent")
-        self.summary_frame.pack(fill="x", padx=20, pady=20)
-        
-        self.tot_topup_lbl = ctk.CTkLabel(self.summary_frame, text="Total to top up: 0.00 PLN", font=FONT_BODY, text_color=COLOR_TEXT)
-        self.tot_topup_lbl.pack(anchor="w", pady=2)
-        
-        self.net_inc_lbl = ctk.CTkLabel(self.summary_frame, text="Net income this month: 0.00 PLN", font=FONT_BODY, text_color=COLOR_TEXT)
-        self.net_inc_lbl.pack(anchor="w", pady=2)
-        
-        sep2 = ctk.CTkFrame(self.summary_frame, height=1, fg_color=COLOR_BORDER)
-        sep2.pack(fill="x", pady=10)
-        
-        self.rem_sav_lbl = ctk.CTkLabel(self.summary_frame, text="Remaining for savings: 0.00 PLN", font=FONT_TITLE, text_color=COLOR_SUCCESS)
-        self.rem_sav_lbl.pack(anchor="w")
-        
-        self.current_vars = {}
-        self.topup_lbls = {}
+        self.editing = False
+
+        # Header with edit toggle
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", pady=(0, 15))
+        ctk.CTkLabel(hdr, text="Cash Flow", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(side="left")
+        self.edit_btn = ctk.CTkButton(hdr, text="✎ Edit", width=80, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self.toggle_edit)
+        self.edit_btn.pack(side="right")
+
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         self.built = False
-        
-    def build_rows(self):
-        for w in self.rows_frame.winfo_children():
+        self.balance_vars = {}
+        self.topup_lbls = {}
+        self.timestamp_lbls = {}
+        self.shared_assumed_var = ctk.StringVar(value="0.00")
+        self.saved_assumed_var = ctk.StringVar(value="0.00")
+        self.shared_actual_var = ctk.StringVar(value="0.00")
+        self.saved_actual_lbl = None
+        self.total_topup_lbl = None
+        self.net_income_lbl = None
+
+    def toggle_edit(self):
+        if self.editing:
+            self.calculate()
+            self.editing = False
+            self.edit_btn.configure(text="✎ Edit", fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER)
+        else:
+            self.editing = True
+            self.edit_btn.configure(text="✓ Done", fg_color=COLOR_PRIMARY, text_color="#FFFFFF", hover_color=COLOR_PRIMARY_HOVER)
+        self.build()
+
+    def build(self):
+        for w in self.scroll.winfo_children():
             w.destroy()
-            
-        buffer_data = self.controller.data.get("cashflow_buffer", {})
-        minimums = buffer_data.get("minimums", {})
-        current = buffer_data.get("current_on_account", {})
-        
-        for cat_id, min_val in minimums.items():
-            row = ctk.CTkFrame(self.rows_frame, fg_color="transparent")
-            row.pack(fill="x", pady=10)
-            
-            lbl_name = cat_id.replace("_", " ").title()
-            ctk.CTkLabel(row, text=lbl_name, font=FONT_LABEL, text_color=COLOR_TEXT, width=150, anchor="w").pack(side="left")
-            
-            ctk.CTkLabel(row, text=f"Minimum: {min_val:,.2f} PLN", font=FONT_BODY, text_color=COLOR_TEXT_MUTED, width=180, anchor="w").pack(side="left")
-            
-            ctk.CTkLabel(row, text="I currently have:", font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=(10, 5))
-            
-            var = ctk.StringVar(value=str(current.get(cat_id, 0.0)))
-            self.current_vars[cat_id] = var
-            entry = ctk.CTkEntry(row, textvariable=var, font=FONT_MONO, text_color=COLOR_TEXT, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER, width=100)
-            entry.pack(side="left", padx=5)
-            ctk.CTkLabel(row, text="PLN", font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(side="left")
-            
-            entry.bind("<KeyRelease>", self.calculate)
-            entry.bind("<FocusOut>", lambda e, v=var: self.format_on_blur(e, v))
-            
-            ctk.CTkLabel(row, text="→ Top up:", font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=(20, 5))
-            t_lbl = ctk.CTkLabel(row, text="0.00 PLN", font=FONT_MONO, text_color=COLOR_PRIMARY)
-            t_lbl.pack(side="left")
-            self.topup_lbls[cat_id] = t_lbl
-            
+
+        data = self.controller.data
+        config = self.controller.config
+        targets = dm.get_cashflow_targets(config)
+        cf = dm.get_cashflow(data)
+
+        # === Current Accounts ===
+        ctk.CTkLabel(self.scroll, text="Accounts to Replenish", font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 8))
+
+        p1_card = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
+        p1_card.pack(fill="x", pady=(0, 15))
+
+        # Column headers
+        hdr_row = ctk.CTkFrame(p1_card, fg_color="transparent")
+        hdr_row.pack(fill="x", padx=15, pady=(15, 5))
+        ctk.CTkLabel(hdr_row, text="Account", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=140, anchor="w").pack(side="left")
+        ctk.CTkLabel(hdr_row, text="Target", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=100, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(hdr_row, text="Current Balance", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=130, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(hdr_row, text="To Transfer", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=100, anchor="w").pack(side="left", padx=5)
+
+        self.balance_vars = {}
+        self.topup_lbls = {}
+        self.timestamp_lbls = {}
+
+        for t in targets:
+            tid = t["id"]
+            acct = cf.get("current_accounts", {}).get(tid, {"balance": 0.0, "updated_at": ""})
+
+            row = ctk.CTkFrame(p1_card, fg_color="transparent")
+            row.pack(fill="x", padx=15, pady=4)
+
+            ctk.CTkLabel(row, text=t["name"], font=FONT_BODY, text_color=COLOR_TEXT, width=140, anchor="w").pack(side="left")
+            ctk.CTkLabel(row, text=f"{t['target']:,.2f}", font=FONT_MONO, text_color=COLOR_TEXT_MUTED, width=100, anchor="w").pack(side="left", padx=5)
+
+            var = ctk.StringVar(value=f"{acct['balance']:.2f}" if acct["balance"] else "0.00")
+            self.balance_vars[tid] = var
+
+            if self.editing:
+                entry = ctk.CTkEntry(row, textvariable=var, font=FONT_MONO, width=110, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER)
+                entry.pack(side="left", padx=5)
+                entry.bind("<KeyRelease>", self.calculate)
+                entry.bind("<FocusOut>", lambda e, v=var, tid_=tid: self.on_balance_blur(v, tid_))
+            else:
+                ctk.CTkLabel(row, text=var.get(), font=FONT_MONO, text_color=COLOR_TEXT, width=110, anchor="w").pack(side="left", padx=5)
+
+            topup_lbl = ctk.CTkLabel(row, text="0.00", font=FONT_MONO, text_color=COLOR_PRIMARY, width=100, anchor="w")
+            topup_lbl.pack(side="left", padx=5)
+            self.topup_lbls[tid] = topup_lbl
+
+            ts_text = acct.get("updated_at", "")
+            ts_lbl = ctk.CTkLabel(row, text=f"Updated: {ts_text}" if ts_text else "", font=FONT_SMALL, text_color=COLOR_TEXT_FAINT)
+            ts_lbl.pack(side="right", padx=10)
+            self.timestamp_lbls[tid] = ts_lbl
+
+        # Total to transfer
+        tot_row = ctk.CTkFrame(p1_card, fg_color="transparent")
+        tot_row.pack(fill="x", padx=15, pady=(10, 15))
+        ctk.CTkLabel(tot_row, text="Total to transfer:", font=FONT_LABEL, text_color=COLOR_TEXT).pack(side="left")
+        self.total_topup_lbl = ctk.CTkLabel(tot_row, text="0.00 PLN", font=FONT_MONO_LG, text_color=COLOR_PRIMARY)
+        self.total_topup_lbl.pack(side="left", padx=10)
+
+        # === Savings & Shared Goals ===
+        ctk.CTkLabel(self.scroll, text="Savings & Shared Goals", font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w", pady=(10, 8))
+
+        p2_card = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
+        p2_card.pack(fill="x", pady=(0, 15))
+
+        cats = data.get("categories", [])
+        shared_cat = next((c for c in cats if c["id"] == "shared"), None)
+        saved_cat = next((c for c in cats if c["id"] == "saved"), None)
+        shared_calc = dm.get_allocated_amount(data, "shared") if shared_cat else 0.0
+        saved_calc = dm.get_allocated_amount(data, "saved") if saved_cat else 0.0
+
+        # Grid header
+        g_hdr = ctk.CTkFrame(p2_card, fg_color="transparent")
+        g_hdr.pack(fill="x", padx=15, pady=(15, 5))
+        ctk.CTkLabel(g_hdr, text="", width=120, anchor="w").pack(side="left")
+        ctk.CTkLabel(g_hdr, text="Shared", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=140, anchor="center").pack(side="left", padx=10)
+        ctk.CTkLabel(g_hdr, text="Saved", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=140, anchor="center").pack(side="left", padx=10)
+
+        # Row: Calculated (always read-only)
+        r_calc = ctk.CTkFrame(p2_card, fg_color="transparent")
+        r_calc.pack(fill="x", padx=15, pady=4)
+        ctk.CTkLabel(r_calc, text="Calculated", font=FONT_LABEL, text_color=COLOR_TEXT, width=120, anchor="w").pack(side="left")
+        ctk.CTkLabel(r_calc, text=f"{shared_calc:,.2f}", font=FONT_MONO, text_color=COLOR_TEXT_MUTED, width=140, anchor="center", fg_color=COLOR_SURFACE_2, corner_radius=6).pack(side="left", padx=10, pady=2)
+        ctk.CTkLabel(r_calc, text=f"{saved_calc:,.2f}", font=FONT_MONO, text_color=COLOR_TEXT_MUTED, width=140, anchor="center", fg_color=COLOR_SURFACE_2, corner_radius=6).pack(side="left", padx=10, pady=2)
+
+        # Row: Assumed
+        r_assumed = ctk.CTkFrame(p2_card, fg_color="transparent")
+        r_assumed.pack(fill="x", padx=15, pady=4)
+        ctk.CTkLabel(r_assumed, text="Assumed", font=FONT_LABEL, text_color=COLOR_TEXT, width=120, anchor="w").pack(side="left")
+        self.shared_assumed_var.set(f"{cf.get('shared_assumed', 0.0):.2f}")
+        self.saved_assumed_var.set(f"{cf.get('saved_assumed', 0.0):.2f}")
+        if self.editing:
+            ctk.CTkEntry(r_assumed, textvariable=self.shared_assumed_var, font=FONT_MONO, width=140, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER).pack(side="left", padx=10)
+            ctk.CTkEntry(r_assumed, textvariable=self.saved_assumed_var, font=FONT_MONO, width=140, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER).pack(side="left", padx=10)
+        else:
+            ctk.CTkLabel(r_assumed, text=self.shared_assumed_var.get(), font=FONT_MONO, text_color=COLOR_TEXT, width=140, anchor="center").pack(side="left", padx=10)
+            ctk.CTkLabel(r_assumed, text=self.saved_assumed_var.get(), font=FONT_MONO, text_color=COLOR_TEXT, width=140, anchor="center").pack(side="left", padx=10)
+
+        # Row: Actual
+        r_actual = ctk.CTkFrame(p2_card, fg_color="transparent")
+        r_actual.pack(fill="x", padx=15, pady=(4, 15))
+        ctk.CTkLabel(r_actual, text="Actual", font=FONT_LABEL, text_color=COLOR_TEXT, width=120, anchor="w").pack(side="left")
+        self.shared_actual_var.set(f"{cf.get('shared_actual', 0.0):.2f}")
+        if self.editing:
+            shared_entry = ctk.CTkEntry(r_actual, textvariable=self.shared_actual_var, font=FONT_MONO, width=140, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER)
+            shared_entry.pack(side="left", padx=10)
+            shared_entry.bind("<KeyRelease>", self.calculate)
+            shared_entry.bind("<FocusOut>", lambda e: self.calculate())
+        else:
+            ctk.CTkLabel(r_actual, text=self.shared_actual_var.get(), font=FONT_MONO, text_color=COLOR_TEXT, width=140, anchor="center").pack(side="left", padx=10)
+
+        self.saved_actual_lbl = ctk.CTkLabel(r_actual, text="0.00", font=FONT_MONO_LG, text_color=COLOR_SUCCESS, width=140, anchor="center", fg_color=COLOR_SURFACE_2, corner_radius=6)
+        self.saved_actual_lbl.pack(side="left", padx=10, pady=2)
+
+        # Net income display
+        sep = ctk.CTkFrame(p2_card, height=1, fg_color=COLOR_BORDER)
+        sep.pack(fill="x", padx=15)
+        net_row = ctk.CTkFrame(p2_card, fg_color="transparent")
+        net_row.pack(fill="x", padx=15, pady=10)
+        ctk.CTkLabel(net_row, text="Net Income:", font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left")
+        self.net_income_lbl = ctk.CTkLabel(net_row, text="0.00 PLN", font=FONT_MONO, text_color=COLOR_INCOME)
+        self.net_income_lbl.pack(side="left", padx=10)
+
         self.built = True
-        
-    def format_on_blur(self, event, var):
-        val = var.get()
-        if val:
-            try:
-                var.set(f"{float(val):.2f}")
-                self.calculate()
-            except: pass
-        
+        self.calculate()
+
+    def on_balance_blur(self, var, tid):
+        val = var.get().replace(",", ".")
+        try:
+            var.set(f"{float(val):.2f}")
+        except:
+            pass
+        # Update timestamp
+        cf = dm.get_cashflow(self.controller.data)
+        acct = cf.setdefault("current_accounts", {}).setdefault(tid, {"balance": 0.0, "updated_at": ""})
+        acct["updated_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+        if tid in self.timestamp_lbls:
+            self.timestamp_lbls[tid].configure(text=f"Updated: {acct['updated_at']}")
+        self.calculate()
+
     def calculate(self, event=None):
         try:
-            buffer_data = self.controller.data.get("cashflow_buffer", {})
-            minimums = buffer_data.get("minimums", {})
-            
+            data = self.controller.data
+            config = self.controller.config
+            targets = dm.get_cashflow_targets(config)
+            cf = dm.get_cashflow(data)
+
+            # Part 1: calculate top-ups
             total_topup = 0.0
-            
-            for cat_id, var in self.current_vars.items():
-                val_str = var.get()
-                if "," in val_str:
-                    val_str = val_str.replace(",", ".")
-                    var.set(val_str)
-                cur_val = float(val_str) if val_str else 0.0
-                buffer_data.setdefault("current_on_account", {})[cat_id] = cur_val
-                
-                min_val = minimums.get(cat_id, 0.0)
-                topup = max(0.0, min_val - cur_val)
+            for t in targets:
+                tid = t["id"]
+                var = self.balance_vars.get(tid)
+                if not var:
+                    continue
+                val_str = var.get().replace(",", ".")
+                balance = float(val_str) if val_str else 0.0
+                cf.setdefault("current_accounts", {}).setdefault(tid, {"balance": 0.0, "updated_at": ""})["balance"] = balance
+                topup = max(0.0, t["target"] - balance)
                 total_topup += topup
-                self.topup_lbls[cat_id].configure(text=f"{topup:,.2f} PLN".replace(",", " "))
-                
-            net_income = dm.get_net_income(self.controller.data)
-            rem = net_income - total_topup
-            
-            self.tot_topup_lbl.configure(text=f"Total to top up: {total_topup:,.2f} PLN".replace(",", " "))
-            self.net_inc_lbl.configure(text=f"Net income this month: {net_income:,.2f} PLN".replace(",", " "))
-            
-            self.rem_sav_lbl.configure(
-                text=f"Remaining for savings: {rem:,.2f} PLN".replace(",", " "),
-                text_color=COLOR_SUCCESS if rem >= 0 else COLOR_ERROR
-            )
-            
+                self.topup_lbls[tid].configure(text=f"{topup:,.2f}")
+
+            self.total_topup_lbl.configure(text=f"{total_topup:,.2f} PLN")
+
+            # Part 2: save all manual values
+            net_income = dm.get_net_income(data)
+            self.net_income_lbl.configure(text=f"{net_income:,.2f} PLN")
+
+            shared_actual = float(self.shared_actual_var.get().replace(",", ".") or "0")
+            cf["shared_actual"] = shared_actual
+
+            shared_assumed = float(self.shared_assumed_var.get().replace(",", ".") or "0")
+            cf["shared_assumed"] = shared_assumed
+
+            saved_assumed = float(self.saved_assumed_var.get().replace(",", ".") or "0")
+            cf["saved_assumed"] = saved_assumed
+
+            # Actual Saved = Net Income - Total Top-ups - Shared Actual
+            actual_saved = net_income - total_topup - shared_actual
+            color = COLOR_SUCCESS if actual_saved >= 0 else COLOR_ERROR
+            self.saved_actual_lbl.configure(text=f"{actual_saved:,.2f}", text_color=color)
+
             self.controller.save_data()
         except:
             pass
 
     def refresh(self):
-        if not self.built:
-            self.build_rows()
-            
-        buffer_data = self.controller.data.get("cashflow_buffer", {})
-        current = buffer_data.get("current_on_account", {})
-        
-        for cat_id, var in self.current_vars.items():
-            var.set(str(current.get(cat_id, 0.0)))
-            
-        self.calculate()
+        self.build()
 
 class HistoryView(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -882,13 +988,70 @@ class SettingsView(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self.controller = controller
         ctk.CTkLabel(self, text="Settings", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 20))
-        
+
+        # Cash Flow Targets card
         card = ctk.CTkFrame(self, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
         card.pack(fill="both", expand=True)
-        ctk.CTkLabel(card, text="Settings configuration will appear here.", text_color=COLOR_TEXT_MUTED).pack(pady=40)
+
+        hdr = ctk.CTkFrame(card, fg_color="transparent")
+        hdr.pack(fill="x", padx=20, pady=(20, 10))
+        ctk.CTkLabel(hdr, text="Cash Flow Targets (Current Accounts)", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
+
+        self.targets_frame = ctk.CTkScrollableFrame(card, fg_color="transparent")
+        self.targets_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+
+        # Add row
+        add_frame = ctk.CTkFrame(card, fg_color="transparent")
+        add_frame.pack(fill="x", padx=20, pady=(0, 20))
+        self.new_name = ctk.CTkEntry(add_frame, placeholder_text="Account name", width=180)
+        self.new_name.pack(side="left", padx=(0, 5))
+        self.new_target = ctk.CTkEntry(add_frame, placeholder_text="Target (PLN)", width=120)
+        self.new_target.pack(side="left", padx=(0, 5))
+        ctk.CTkButton(add_frame, text="+ Add", width=70, command=self.add_target).pack(side="left")
+
+    def add_target(self):
+        name = self.new_name.get().strip()
+        try:
+            amt = float(self.new_target.get().replace(",", "."))
+        except:
+            return
+        if not name or amt <= 0:
+            return
+        dm.add_cashflow_target(name, amt)
+        self.new_name.delete(0, "end")
+        self.new_target.delete(0, "end")
+        self.controller.config = dm.get_config()
+        self.refresh()
+
+    def delete_target(self, tid):
+        dm.delete_cashflow_target(tid)
+        self.controller.config = dm.get_config()
+        self.refresh()
+
+    def save_edit(self, tid, name_var, amt_var):
+        name = name_var.get().strip()
+        try:
+            amt = float(amt_var.get().replace(",", "."))
+        except:
+            return
+        if name and amt > 0:
+            dm.edit_cashflow_target(tid, name=name, target_amount=amt)
+            self.controller.config = dm.get_config()
 
     def refresh(self):
-        pass
+        for w in self.targets_frame.winfo_children():
+            w.destroy()
+        targets = dm.get_cashflow_targets(self.controller.config)
+        for t in targets:
+            row = ctk.CTkFrame(self.targets_frame, fg_color=COLOR_SURFACE_2, corner_radius=8)
+            row.pack(fill="x", pady=3)
+            name_var = ctk.StringVar(value=t["name"])
+            amt_var = ctk.StringVar(value=f"{t['target']:.2f}")
+            ctk.CTkEntry(row, textvariable=name_var, font=FONT_BODY, width=180, fg_color=COLOR_SURFACE, border_color=COLOR_BORDER).pack(side="left", padx=(10, 5), pady=8)
+            ctk.CTkEntry(row, textvariable=amt_var, font=FONT_MONO, width=100, fg_color=COLOR_SURFACE, border_color=COLOR_BORDER).pack(side="left", padx=5, pady=8)
+            ctk.CTkLabel(row, text="PLN", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="left")
+            ctk.CTkButton(row, text="💾", width=28, height=28, fg_color="transparent", text_color=COLOR_SUCCESS, hover_color=COLOR_BORDER, command=lambda tid=t["id"], n=name_var, a=amt_var: self.save_edit(tid, n, a)).pack(side="right", padx=2, pady=5)
+            ctk.CTkButton(row, text="🗑", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda tid=t["id"]: self.delete_target(tid)).pack(side="right", padx=5, pady=5)
 
 if __name__ == "__main__":
     app = FlorinApp()
