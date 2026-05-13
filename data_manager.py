@@ -136,6 +136,147 @@ def delete_cashflow_target(target_id):
 def get_cashflow(data):
     return data.setdefault("cashflow", {"current_accounts": {}, "shared_actual": 0.0, "shared_assumed": 0.0, "saved_assumed": 0.0})
 
+# --- Savings Planner (Sinking Funds) ---
+SAVINGS_FILE = DATA_DIR / "savings_planner.json"
+
+def get_savings_planner():
+    init_env()
+    if SAVINGS_FILE.exists():
+        with open(SAVINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    default = {
+        "year": datetime.now().year,
+        "categories": [],
+        "groups": [],
+        "grid": {},        # {cat_id: {"01": 0, "02": 0, ... "12": 0}}
+        "assumed": {},     # {"01": 0, ... "12": 0}
+    }
+    save_savings_planner(default)
+    return default
+
+def save_savings_planner(sp):
+    init_env()
+    with open(SAVINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(sp, f, indent=2)
+
+def add_savings_category(sp, name, target, deadline_month=12, group_id=None, next_year_target=None):
+    cat = {
+        "id": generate_id(),
+        "name": name,
+        "target": target,
+        "deadline_month": deadline_month,
+        "group_id": group_id,
+        "next_year_target": next_year_target,
+    }
+    sp["categories"].append(cat)
+    # Init grid with even distribution up to deadline
+    months_count = deadline_month
+    monthly = round(target / months_count, 2) if months_count > 0 else 0
+    grid_row = {f"{m:02d}": monthly if m <= deadline_month else 0.0 for m in range(1, 13)}
+    # If next_year_target set, distribute after deadline
+    if next_year_target and deadline_month < 12:
+        remaining_months = 12 - deadline_month
+        monthly_nyt = round(next_year_target / remaining_months, 2)
+        for m in range(deadline_month + 1, 13):
+            grid_row[f"{m:02d}"] = monthly_nyt
+    sp["grid"][cat["id"]] = grid_row
+    return cat
+
+def edit_savings_category(sp, cat_id, **fields):
+    for cat in sp["categories"]:
+        if cat["id"] == cat_id:
+            cat.update(fields)
+            return cat
+    return None
+
+def delete_savings_category(sp, cat_id):
+    sp["categories"] = [c for c in sp["categories"] if c["id"] != cat_id]
+    sp["grid"].pop(cat_id, None)
+
+def add_savings_group(sp, name):
+    g = {"id": generate_id(), "name": name}
+    sp["groups"].append(g)
+    return g
+
+def edit_savings_group(sp, group_id, name):
+    for g in sp["groups"]:
+        if g["id"] == group_id:
+            g["name"] = name
+            return g
+    return None
+
+def delete_savings_group(sp, group_id):
+    sp["groups"] = [g for g in sp["groups"] if g["id"] != group_id]
+    for cat in sp["categories"]:
+        if cat.get("group_id") == group_id:
+            cat["group_id"] = None
+
+def get_month_total_allocated(sp, month_key):
+    """Sum of all categories for a given month."""
+    total = 0.0
+    for cat_id, months in sp.get("grid", {}).items():
+        total += months.get(month_key, 0.0)
+    return total
+
+def get_month_remaining(sp, month_key):
+    assumed = sp.get("assumed", {}).get(month_key, 0.0)
+    allocated = get_month_total_allocated(sp, month_key)
+    return assumed - allocated
+
+# --- Actual Savings Tracker ---
+def get_savings_actual(sp):
+    """Get or init actual tracking data within savings planner."""
+    sp.setdefault("actual_grid", {})       # {cat_id: {"01": amt, ...}}
+    sp.setdefault("actual_available", {})  # {"01": amt, ...}
+    sp.setdefault("spent", {})             # {cat_id: amount}
+    return sp
+
+def get_actual_month_total(sp, month_key):
+    total = 0.0
+    for cat_id, months in sp.get("actual_grid", {}).items():
+        total += months.get(month_key, 0.0)
+    return total
+
+def get_actual_month_remaining(sp, month_key):
+    available = sp.get("actual_available", {}).get(month_key, 0.0)
+    allocated = get_actual_month_total(sp, month_key)
+    return available - allocated
+
+def get_cat_total_saved(sp, cat_id):
+    return sum(sp.get("actual_grid", {}).get(cat_id, {}).values())
+
+def get_cat_missing(sp, cat_id):
+    cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    if not cat:
+        return 0.0
+    return max(0.0, cat["target"] - get_cat_total_saved(sp, cat_id))
+
+def get_cat_progress(sp, cat_id):
+    """Progress % based on target up to deadline (not full year)."""
+    cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    if not cat or cat["target"] <= 0:
+        return 0.0
+    return min(1.0, get_cat_total_saved(sp, cat_id) / cat["target"])
+
+def get_cat_balance(sp, cat_id, monthly_data=None):
+    """Total Saved - Spent. If monthly_data provided, pull spent from expenses."""
+    saved = get_cat_total_saved(sp, cat_id)
+    if monthly_data:
+        spent = get_savings_spent(monthly_data, cat_id)
+    else:
+        spent = sp.get("spent", {}).get(cat_id, 0.0)
+    return saved - spent
+
+def get_cat_rollover(sp, cat_id, monthly_data=None):
+    """Calculate rollover: balance after deadline if next_year_target exists."""
+    cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    if not cat or not cat.get("next_year_target"):
+        return 0.0
+    balance = get_cat_balance(sp, cat_id, monthly_data)
+    if balance > 0 and get_cat_progress(sp, cat_id) >= 1.0:
+        return balance
+    return 0.0
+
 def load_xlsx(filepath: str, password: str = None, sheet_name: str = "kwiecień 2026") -> dict:
     try:
         with open(filepath, 'rb') as f:
@@ -233,12 +374,15 @@ def get_expense_category_total(data, expense_cat_id):
     return sum(e["amount"] for e in data.get("expenses", []) if e.get("expense_category_id") == expense_cat_id)
 
 def get_expense_category_split_breakdown(data, expense_cat_id):
-    """For an expense category, show how much from each income split bucket."""
+    """For an expense category, show how much from each funding source."""
     breakdown = {}
     for exp in data.get("expenses", []):
         if exp.get("expense_category_id") == expense_cat_id:
-            split_id = exp.get("category_id", "unknown")
-            breakdown[split_id] = breakdown.get(split_id, 0.0) + exp["amount"]
+            if exp.get("savings_category_id"):
+                key = f"sav:{exp['savings_category_id']}"
+            else:
+                key = exp.get("category_id") or "unknown"
+            breakdown[key] = breakdown.get(key, 0.0) + exp["amount"]
     return breakdown
 
 # --- Helper calculations ---
@@ -262,9 +406,18 @@ def get_allocated_amount(data, category_id):
     return 0.0
 
 def get_spent_amount(data, category_id):
+    """Sum expenses for income split bucket, excluding savings-funded ones."""
     total = 0.0
     for exp in data.get("expenses", []):
-        if exp["category_id"] == category_id:
+        if exp.get("category_id") == category_id and not exp.get("savings_category_id"):
+            total += exp["amount"]
+    return total
+
+def get_savings_spent(data, savings_cat_id):
+    """Sum expenses funded from a specific savings category."""
+    total = 0.0
+    for exp in data.get("expenses", []):
+        if exp.get("savings_category_id") == savings_cat_id:
             total += exp["amount"]
     return total
 
