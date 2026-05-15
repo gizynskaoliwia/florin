@@ -37,21 +37,54 @@ def save_config(config):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
 
+def _get_previous_month_str(month_str):
+    """Return YYYY-MM string for the month before month_str."""
+    year, month = int(month_str[:4]), int(month_str[5:7])
+    month -= 1
+    if month == 0:
+        month = 12
+        year -= 1
+    return f"{year:04d}-{month:02d}"
+
 def generate_default_month(month_str):
+    # Carry over categories/expense_categories from previous month if available
+    prev = _get_previous_month_str(month_str)
+    prev_path = get_month_filepath(prev)
+    if prev_path.exists():
+        with open(prev_path, "r", encoding="utf-8") as f:
+            prev_data = json.load(f)
+        categories = prev_data.get("categories", [
+            {"id": "daily_life", "name": "Daily Life", "percent": 40, "color": "#C9A86B"},
+            {"id": "shared", "name": "Shared", "percent": 20, "color": "#6B98C9"},
+            {"id": "saved", "name": "Saved", "percent": 20, "color": "#6BAD8A"},
+            {"id": "pleasure", "name": "Pleasure", "percent": 20, "color": "#C96B98"},
+        ])
+        expense_categories = prev_data.get("expense_categories", list(DEFAULT_EXPENSE_CATEGORIES))
+    else:
+        categories = [
+            {"id": "daily_life", "name": "Daily Life", "percent": 40, "color": "#C9A86B"},
+            {"id": "shared", "name": "Shared", "percent": 20, "color": "#6B98C9"},
+            {"id": "saved", "name": "Saved", "percent": 20, "color": "#6BAD8A"},
+            {"id": "pleasure", "name": "Pleasure", "percent": 20, "color": "#C96B98"},
+        ]
+        expense_categories = list(DEFAULT_EXPENSE_CATEGORIES)
+
+    # Seed income_items from default_income_items in config (amount=0)
     config = get_config()
+    default_items = config.get("default_income_items", [])
+    income_items = [
+        {"id": generate_id(), "name": di["name"], "amount": 0.0, "type": di["type"], "category_id": None}
+        for di in default_items
+    ]
+
     return {
         "month": month_str,
-        "income_items": [],
-        "categories": [
-            { "id": "daily_life", "name": "Daily Life", "percent": 40, "color": "#C9A86B" },
-            { "id": "shared", "name": "Shared", "percent": 20, "color": "#6B98C9" },
-            { "id": "saved", "name": "Saved", "percent": 20, "color": "#6BAD8A" },
-            { "id": "pleasure", "name": "Pleasure", "percent": 20, "color": "#C96B98" }
-        ],
-        "expense_categories": list(DEFAULT_EXPENSE_CATEGORIES),
+        "income_items": income_items,
+        "categories": categories,
+        "expense_categories": expense_categories,
         "expenses": [],
         "cashflow": {
-            "current_accounts": {},  # {target_id: {"balance": 0.0, "updated_at": ""}}
+            "current_accounts": {},
             "shared_actual": 0.0,
             "shared_assumed": 0.0,
             "saved_assumed": 0.0,
@@ -81,6 +114,17 @@ def migrate_month_data(data):
 def get_month_filepath(month_str):
     return DATA_DIR / f"{month_str}.json"
 
+def get_past_months(current_month):
+    """Return list of month strings (YYYY-MM) that have data files, excluding current."""
+    init_env()
+    months = []
+    for f in DATA_DIR.glob("????-??.json"):
+        m = f.stem
+        if m != current_month:
+            months.append(m)
+    months.sort(reverse=True)
+    return months
+
 def load_month(month_str):
     init_env()
     filepath = get_month_filepath(month_str)
@@ -100,6 +144,25 @@ def save_month(month_str, data):
 
 def generate_id():
     return str(uuid.uuid4())
+
+# --- Default Income Items (config-level) ---
+def get_default_income_items(config=None):
+    if config is None:
+        config = get_config()
+    return config.get("default_income_items", [])
+
+def add_default_income_item(name, item_type="addition"):
+    config = get_config()
+    items = config.setdefault("default_income_items", [])
+    item = {"id": generate_id(), "name": name, "type": item_type}
+    items.append(item)
+    save_config(config)
+    return item
+
+def delete_default_income_item(item_id):
+    config = get_config()
+    config["default_income_items"] = [i for i in config.get("default_income_items", []) if i["id"] != item_id]
+    save_config(config)
 
 # --- Cashflow Targets (config-level) ---
 def get_cashflow_targets(config=None):
@@ -276,6 +339,70 @@ def get_cat_rollover(sp, cat_id, monthly_data=None):
     if balance > 0 and get_cat_progress(sp, cat_id) >= 1.0:
         return balance
     return 0.0
+
+def get_cascade_adjustments(sp, cat_id):
+    """Strict per-category surplus cascade deduction.
+    
+    Algorithm:
+    1. Only applies if category target is fully met (progress >= 100%)
+    2. Surplus = Total Saved - Total Spent (the unspent excess)
+    3. Cascade: deduct from post-deadline planned months left-to-right
+    
+    Returns {month_key: adjusted_amount} ONLY for affected cells.
+    Returns empty dict if no surplus or conditions not met.
+    """
+    cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    if not cat or not cat.get("next_year_target"):
+        return {}
+    deadline = cat.get("deadline_month", 12)
+    if deadline >= 12:
+        return {}
+    # Gate: target must be fully met for this category
+    if get_cat_progress(sp, cat_id) < 1.0:
+        return {}
+    # Surplus = Total Saved - Total Spent (for THIS category only)
+    total_saved = get_cat_total_saved(sp, cat_id)
+    total_spent = _get_all_months_savings_spent(cat_id)
+    # No surplus if nothing has been spent yet (goal event hasn't occurred)
+    if total_spent <= 0:
+        return {}
+    surplus = total_saved - total_spent
+    if surplus <= 0:
+        return {}
+    # Cascade loop: only post-deadline months
+    grid_row = sp.get("grid", {}).get(cat_id, {})
+    adjustments = {}
+    remaining_surplus = surplus
+    for m in range(deadline + 1, 13):
+        if remaining_surplus <= 0:
+            break
+        mk = f"{m:02d}"
+        planned = grid_row.get(mk, 0.0)
+        if planned <= 0:
+            continue
+        if remaining_surplus >= planned:
+            adjustments[mk] = 0.0
+            remaining_surplus -= planned
+        else:
+            adjustments[mk] = planned - remaining_surplus
+            remaining_surplus = 0.0
+    return adjustments
+
+
+def _get_all_months_savings_spent(savings_cat_id):
+    """Sum expenses funded from a savings category across ALL month files."""
+    init_env()
+    total = 0.0
+    for f in DATA_DIR.glob("????-??.json"):
+        try:
+            with open(f, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            for exp in data.get("expenses", []):
+                if exp.get("savings_category_id") == savings_cat_id:
+                    total += exp.get("amount", 0.0)
+        except:
+            pass
+    return total
 
 def load_xlsx(filepath: str, password: str = None, sheet_name: str = "kwiecień 2026") -> dict:
     try:
