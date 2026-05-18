@@ -888,6 +888,8 @@ class SavingsView(ctk.CTkFrame):
         self.actual_collapsed = set()
         self.planning_collapsed = set()
         self._user_toggled = set()
+        self._planning_deferred = {}
+        self._actual_deferred = {}
 
         # Header
         hdr = ctk.CTkFrame(self, fg_color="transparent")
@@ -1106,12 +1108,66 @@ class SavingsView(ctk.CTkFrame):
                 target = cat["target"] if cat else 0
                 lbl.configure(text=f"{row_total:,.0f} / {target:,.0f}")
 
+    def _render_planning_cat_row(self, table, cat, r, grid, all_cascades, current_m):
+        COL_W = 60
+        NAME_W = 150
+        name_frame = ctk.CTkFrame(table, fg_color="transparent")
+        name_frame.grid(row=r, column=0, padx=2, pady=1, sticky="w")
+        ctk.CTkLabel(name_frame, text=cat["name"], font=FONT_BODY, text_color=COLOR_TEXT, width=NAME_W-50, anchor="w").pack(side="left")
+        if self.editing:
+            ctk.CTkButton(name_frame, text="✎", width=20, height=20, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=lambda c=cat: self.open_category_editor(c)).pack(side="right", padx=1)
+            ctk.CTkButton(name_frame, text="×", width=20, height=20, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda cid=cat["id"]: self.delete_category(cid)).pack(side="right")
+
+        cat_grid = grid.get(cat["id"], {})
+        deadline = cat.get("deadline_month", 12)
+        cascade = all_cascades.get(cat["id"], {})
+        for m in range(12):
+            mk = f"{m+1:02d}"
+            val = cat_grid.get(mk, 0.0)
+            is_deadline = (m + 1 == deadline)
+            cell_bg = COLOR_ACCENT if is_deadline else COLOR_SURFACE_2
+            if self.editing:
+                var = ctk.StringVar(value=f"{val:.0f}" if val else "")
+                self.cell_vars[(cat["id"], mk)] = var
+                e = ctk.CTkEntry(table, textvariable=var, font=FONT_SMALL, width=COL_W, height=26, fg_color=cell_bg, border_color=COLOR_PRIMARY if is_deadline else COLOR_BORDER, justify="center")
+                e.grid(row=r, column=m+1, padx=1, pady=1)
+                e.bind("<FocusOut>", lambda ev, cid=cat["id"], mk_=mk, v=var: self.on_cell_change(cid, mk_, v))
+                e.bind("<Return>", lambda ev, cid=cat["id"], mk_=mk, v=var: self.on_cell_change(cid, mk_, v))
+            else:
+                if mk in cascade:
+                    adjusted = cascade[mk]
+                    cell_frame = ctk.CTkFrame(table, fg_color="#FFF3E0", corner_radius=4, width=COL_W, height=26)
+                    cell_frame.grid(row=r, column=m+1, padx=1, pady=1)
+                    cell_frame.grid_propagate(False)
+                    cell_frame.grid_columnconfigure(0, weight=1)
+                    cell_frame.grid_rowconfigure((0, 1), weight=1)
+                    ctk.CTkLabel(cell_frame, text=f"{val:,.0f}", font=("Segoe UI", 8, "overstrike"), text_color=COLOR_TEXT_MUTED, height=12).grid(row=0, column=0)
+                    ctk.CTkLabel(cell_frame, text=f"{adjusted:,.0f}", font=("Segoe UI", 9, "bold"), text_color=COLOR_WARNING, height=12).grid(row=1, column=0)
+                else:
+                    txt = f"{val:,.0f}" if val else "–"
+                    is_current = (m + 1 == current_m)
+                    if is_deadline:
+                        bg = COLOR_ACCENT
+                    elif is_current:
+                        bg = COLOR_CURRENT_MONTH
+                    else:
+                        bg = "transparent"
+                    ctk.CTkLabel(table, text=txt, font=FONT_SMALL, text_color=COLOR_TEXT, width=COL_W, anchor="center", fg_color=bg, corner_radius=4).grid(row=r, column=m+1, padx=1, pady=1)
+
+        row_total = sum(cat_grid.get(f"{m+1:02d}", 0.0) for m in range(deadline))
+        lbl = ctk.CTkLabel(table, text=f"{row_total:,.0f} / {cat['target']:,.0f}", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, width=100, anchor="center")
+        lbl.grid(row=r, column=13, padx=2, pady=1)
+        self.cat_total_lbls[cat["id"]] = lbl
+
     def build_grid(self):
         sp = self.sp
         categories = sp.get("categories", [])
         groups = sp.get("groups", [])
         grid = sp.get("grid", {})
         assumed = sp.get("assumed", {})
+
+        # Pre-compute all cascade adjustments once
+        all_cascades = {cat["id"]: dm.get_cascade_adjustments(sp, cat["id"], self._spent_cache) for cat in categories}
 
         table = ctk.CTkFrame(self.scroll, fg_color="transparent")
         table.pack(anchor="nw")
@@ -1141,56 +1197,7 @@ class SavingsView(ctk.CTkFrame):
                 ungrouped.append(cat)
 
         def render_cat_row(cat, r):
-            name_frame = ctk.CTkFrame(table, fg_color="transparent")
-            name_frame.grid(row=r, column=0, padx=2, pady=1, sticky="w")
-            ctk.CTkLabel(name_frame, text=cat["name"], font=FONT_BODY, text_color=COLOR_TEXT, width=NAME_W-50, anchor="w").pack(side="left")
-            if self.editing:
-                ctk.CTkButton(name_frame, text="✎", width=20, height=20, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=lambda c=cat: self.open_category_editor(c)).pack(side="right", padx=1)
-                ctk.CTkButton(name_frame, text="×", width=20, height=20, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda cid=cat["id"]: self.delete_category(cid)).pack(side="right")
-
-            cat_grid = grid.get(cat["id"], {})
-            deadline = cat.get("deadline_month", 12)
-            # Get cascade adjustments for this category
-            cascade = dm.get_cascade_adjustments(sp, cat["id"])
-            for m in range(12):
-                mk = f"{m+1:02d}"
-                val = cat_grid.get(mk, 0.0)
-                is_deadline = (m + 1 == deadline)
-                cell_bg = COLOR_ACCENT if is_deadline else COLOR_SURFACE_2
-                if self.editing:
-                    var = ctk.StringVar(value=f"{val:.0f}" if val else "")
-                    self.cell_vars[(cat["id"], mk)] = var
-                    e = ctk.CTkEntry(table, textvariable=var, font=FONT_SMALL, width=COL_W, height=26, fg_color=cell_bg, border_color=COLOR_PRIMARY if is_deadline else COLOR_BORDER, justify="center")
-                    e.grid(row=r, column=m+1, padx=1, pady=1)
-                    e.bind("<FocusOut>", lambda ev, cid=cat["id"], mk_=mk, v=var: self.on_cell_change(cid, mk_, v))
-                    e.bind("<Return>", lambda ev, cid=cat["id"], mk_=mk, v=var: self.on_cell_change(cid, mk_, v))
-                else:
-                    if mk in cascade:
-                        # Show crossed-out original + adjusted
-                        adjusted = cascade[mk]
-                        cell_frame = ctk.CTkFrame(table, fg_color="#FFF3E0", corner_radius=4, width=COL_W, height=26)
-                        cell_frame.grid(row=r, column=m+1, padx=1, pady=1)
-                        cell_frame.grid_propagate(False)
-                        cell_frame.grid_columnconfigure(0, weight=1)
-                        cell_frame.grid_rowconfigure((0, 1), weight=1)
-                        ctk.CTkLabel(cell_frame, text=f"{val:,.0f}", font=("Segoe UI", 8, "overstrike"), text_color=COLOR_TEXT_MUTED, height=12).grid(row=0, column=0)
-                        ctk.CTkLabel(cell_frame, text=f"{adjusted:,.0f}", font=("Segoe UI", 9, "bold"), text_color=COLOR_WARNING, height=12).grid(row=1, column=0)
-                    else:
-                        txt = f"{val:,.0f}" if val else "–"
-                        is_current = (m + 1 == current_m)
-                        if is_deadline:
-                            bg = COLOR_ACCENT
-                        elif is_current:
-                            bg = COLOR_CURRENT_MONTH
-                        else:
-                            bg = "transparent"
-                        ctk.CTkLabel(table, text=txt, font=FONT_SMALL, text_color=COLOR_TEXT, width=COL_W, anchor="center", fg_color=bg, corner_radius=4).grid(row=r, column=m+1, padx=1, pady=1)
-
-            deadline = cat.get("deadline_month", 12)
-            row_total = sum(cat_grid.get(f"{m+1:02d}", 0.0) for m in range(deadline))
-            lbl = ctk.CTkLabel(table, text=f"{row_total:,.0f} / {cat['target']:,.0f}", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, width=100, anchor="center")
-            lbl.grid(row=r, column=13, padx=2, pady=1)
-            self.cat_total_lbls[cat["id"]] = lbl
+            self._render_planning_cat_row(table, cat, r, grid, all_cascades, current_m)
 
         def render_group_row(group, r):
             collapsed = group["id"] in self.planning_collapsed
@@ -1200,8 +1207,8 @@ class SavingsView(ctk.CTkFrame):
             lbl.bind("<Button-1>", lambda e, gid=group["id"]: self.toggle_planning_group(gid))
             self.planning_group_labels[group["id"]] = lbl
             children = [c for c in categories if c.get("group_id") == group["id"]]
-            # Pre-compute cascade adjustments for each child
-            child_cascades = {c["id"]: dm.get_cascade_adjustments(sp, c["id"]) for c in children}
+            # Use pre-computed cascade adjustments for each child
+            child_cascades = {c["id"]: all_cascades.get(c["id"], {}) for c in children}
             for m in range(12):
                 mk = f"{m+1:02d}"
                 total = 0.0
@@ -1219,16 +1226,21 @@ class SavingsView(ctk.CTkFrame):
         for group in groups:
             render_group_row(group, row_idx)
             row_idx += 1
-            child_widgets = []
-            for cat in grouped_cats.get(group["id"], []):
-                render_cat_row(cat, row_idx)
-                row_widgets = [w for w in table.grid_slaves(row=row_idx)]
-                child_widgets.extend(row_widgets)
-                if group["id"] in self.planning_collapsed:
-                    for w in row_widgets:
-                        w.grid_remove()
-                row_idx += 1
-            self.planning_group_children[group["id"]] = child_widgets
+            cats_in_group = grouped_cats.get(group["id"], [])
+            if group["id"] in self.planning_collapsed:
+                # Defer: reserve rows but don't create widgets
+                start_row = row_idx
+                row_idx += len(cats_in_group)
+                self.planning_group_children[group["id"]] = []
+                self._planning_deferred[group["id"]] = (table, cats_in_group, start_row, all_cascades)
+            else:
+                child_widgets = []
+                for cat in cats_in_group:
+                    render_cat_row(cat, row_idx)
+                    row_widgets = [w for w in table.grid_slaves(row=row_idx)]
+                    child_widgets.extend(row_widgets)
+                    row_idx += 1
+                self.planning_group_children[group["id"]] = child_widgets
 
         row_idx += 1
 
@@ -1273,6 +1285,21 @@ class SavingsView(ctk.CTkFrame):
         self._user_toggled.add(group_id)
         self.actual_collapsed.discard(group_id) if group_id in self.actual_collapsed else self.actual_collapsed.add(group_id)
         collapsed = group_id in self.actual_collapsed
+        # Build deferred widgets on first expand
+        if not collapsed and group_id in self._actual_deferred:
+            table, children, start_row = self._actual_deferred.pop(group_id)
+            sp = self.sp
+            data = self.controller.data
+            actual_grid = sp.get("actual_grid", {})
+            plan_grid = sp.get("grid", {})
+            current_m = datetime.now().month
+            child_widgets = []
+            for i, cat in enumerate(children):
+                r = start_row + i
+                self._render_actual_cat_row(table, cat, r, actual_grid, plan_grid, sp, data, current_m)
+                row_widgets = [w for w in table.grid_slaves(row=r)]
+                child_widgets.extend(row_widgets)
+            self.actual_group_children[group_id] = child_widgets
         # Toggle visibility of child row widgets
         for widget in self.actual_group_children.get(group_id, []):
             if collapsed:
@@ -1287,6 +1314,19 @@ class SavingsView(ctk.CTkFrame):
         self._user_toggled.add(group_id)
         self.planning_collapsed.discard(group_id) if group_id in self.planning_collapsed else self.planning_collapsed.add(group_id)
         collapsed = group_id in self.planning_collapsed
+        # Build deferred widgets on first expand
+        if not collapsed and group_id in self._planning_deferred:
+            table, cats, start_row, all_cascades = self._planning_deferred.pop(group_id)
+            child_widgets = []
+            sp = self.sp
+            grid = sp.get("grid", {})
+            current_m = datetime.now().month
+            for i, cat in enumerate(cats):
+                r = start_row + i
+                self._render_planning_cat_row(table, cat, r, grid, all_cascades, current_m)
+                row_widgets = [w for w in table.grid_slaves(row=r)]
+                child_widgets.extend(row_widgets)
+            self.planning_group_children[group_id] = child_widgets
         # Toggle visibility of child row widgets
         for widget in self.planning_group_children.get(group_id, []):
             if collapsed:
@@ -1299,6 +1339,66 @@ class SavingsView(ctk.CTkFrame):
 
     def _get_group_name(self, group_id):
         return next((g["name"] for g in self.sp.get("groups", []) if g["id"] == group_id), "")
+
+    def _render_actual_cat_row(self, table, cat, r, actual_grid, plan_grid, sp, data, current_m):
+        COL_W = 60
+        NAME_W = 150
+        ctk.CTkLabel(table, text=cat["name"], font=FONT_BODY, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=r, column=0, padx=2, pady=1, sticky="w")
+        cat_actual = actual_grid.get(cat["id"], {})
+        cat_plan = plan_grid.get(cat["id"], {})
+        deadline = cat.get("deadline_month", 12)
+        for m in range(12):
+            mk = f"{m+1:02d}"
+            val = cat_actual.get(mk, 0.0)
+            planned = cat_plan.get(mk, 0.0)
+            is_deadline = (m + 1 == deadline)
+            cell_bg = COLOR_ACCENT if is_deadline else COLOR_SURFACE_2
+            if self.editing:
+                var = ctk.StringVar(value=f"{val:.0f}" if val else "")
+                self.cell_vars[("actual", cat["id"], mk)] = var
+                e = ctk.CTkEntry(table, textvariable=var, font=FONT_SMALL, width=COL_W, height=26, fg_color=cell_bg, border_color=COLOR_PRIMARY if is_deadline else COLOR_BORDER, justify="center")
+                e.grid(row=r, column=m+1, padx=1, pady=1)
+                e.bind("<KeyRelease>", lambda ev, cid=cat["id"], mk_=mk, v=var: self._on_actual_cell(cid, mk_, v))
+                e.bind("<FocusOut>", lambda ev, cid=cat["id"], mk_=mk, v=var: self._on_actual_cell_save(cid, mk_, v))
+            else:
+                if val and planned:
+                    if val > planned:
+                        color = COLOR_OVER_PLAN
+                    elif val >= planned:
+                        color = COLOR_MET_PLAN
+                    else:
+                        color = COLOR_UNDER_PLAN
+                elif val:
+                    color = COLOR_TEXT
+                else:
+                    color = COLOR_TEXT_MUTED
+                txt = f"{val:,.0f}" if val else "–"
+                is_current = (m + 1 == current_m)
+                if is_deadline:
+                    bg = COLOR_ACCENT
+                elif is_current:
+                    bg = COLOR_CURRENT_MONTH
+                else:
+                    bg = "transparent"
+                ctk.CTkLabel(table, text=txt, font=FONT_SMALL, text_color=color, width=COL_W, anchor="center", fg_color=bg, corner_radius=4).grid(row=r, column=m+1, padx=1, pady=1)
+
+        saved = dm.get_cat_total_saved(sp, cat["id"])
+        missing = dm.get_cat_missing(sp, cat["id"])
+        progress = dm.get_cat_progress(sp, cat["id"])
+        spent = dm.get_savings_spent(data, cat["id"])
+        balance = saved - spent
+
+        s_lbl = ctk.CTkLabel(table, text=f"{saved:,.0f}", font=FONT_SMALL, text_color=COLOR_TEXT, width=55, anchor="center")
+        s_lbl.grid(row=r, column=13, padx=1, pady=1)
+        m_lbl = ctk.CTkLabel(table, text=f"{missing:,.0f}", font=FONT_SMALL, text_color=COLOR_WARNING if missing > 0 else COLOR_SUCCESS, width=55, anchor="center")
+        m_lbl.grid(row=r, column=14, padx=1, pady=1)
+        p_lbl = ctk.CTkLabel(table, text=f"{progress*100:.0f}%", font=FONT_SMALL, text_color=COLOR_SUCCESS if progress >= 1.0 else COLOR_TEXT, width=55, anchor="center")
+        p_lbl.grid(row=r, column=15, padx=1, pady=1)
+        sp_lbl = ctk.CTkLabel(table, text=f"{spent:,.0f}" if spent else "–", font=FONT_SMALL, text_color=COLOR_EXPENSE, width=55, anchor="center")
+        sp_lbl.grid(row=r, column=16, padx=1, pady=1)
+        b_lbl = ctk.CTkLabel(table, text=f"{balance:,.0f}", font=FONT_SMALL, text_color=COLOR_SUCCESS if balance >= 0 else COLOR_ERROR, width=55, anchor="center")
+        b_lbl.grid(row=r, column=17, padx=1, pady=1)
+        self.actual_summary_lbls[cat["id"]] = {"saved": s_lbl, "missing": m_lbl, "progress": p_lbl, "balance": b_lbl}
 
     def build_actual_table(self):
         """Render actual savings tracker table (top section)."""
@@ -1337,64 +1437,7 @@ class SavingsView(ctk.CTkFrame):
                 ungrouped.append(cat)
 
         def render_actual_row(cat, r):
-            ctk.CTkLabel(table, text=cat["name"], font=FONT_BODY, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=r, column=0, padx=2, pady=1, sticky="w")
-            cat_actual = actual_grid.get(cat["id"], {})
-            cat_plan = plan_grid.get(cat["id"], {})
-            deadline = cat.get("deadline_month", 12)
-            for m in range(12):
-                mk = f"{m+1:02d}"
-                val = cat_actual.get(mk, 0.0)
-                planned = cat_plan.get(mk, 0.0)
-                is_deadline = (m + 1 == deadline)
-                cell_bg = COLOR_ACCENT if is_deadline else COLOR_SURFACE_2
-                if self.editing:
-                    var = ctk.StringVar(value=f"{val:.0f}" if val else "")
-                    self.cell_vars[("actual", cat["id"], mk)] = var
-                    e = ctk.CTkEntry(table, textvariable=var, font=FONT_SMALL, width=COL_W, height=26, fg_color=cell_bg, border_color=COLOR_PRIMARY if is_deadline else COLOR_BORDER, justify="center")
-                    e.grid(row=r, column=m+1, padx=1, pady=1)
-                    e.bind("<KeyRelease>", lambda ev, cid=cat["id"], mk_=mk, v=var: self._on_actual_cell(cid, mk_, v))
-                    e.bind("<FocusOut>", lambda ev, cid=cat["id"], mk_=mk, v=var: self._on_actual_cell_save(cid, mk_, v))
-                else:
-                    # Subtle plan vs actual comparison (text color only)
-                    if val and planned:
-                        if val > planned:
-                            color = COLOR_OVER_PLAN
-                        elif val >= planned:
-                            color = COLOR_MET_PLAN
-                        else:
-                            color = COLOR_UNDER_PLAN
-                    elif val:
-                        color = COLOR_TEXT
-                    else:
-                        color = COLOR_TEXT_MUTED
-                    txt = f"{val:,.0f}" if val else "–"
-                    # Background: deadline > current month > transparent
-                    is_current = (m + 1 == current_m)
-                    if is_deadline:
-                        bg = COLOR_ACCENT
-                    elif is_current:
-                        bg = COLOR_CURRENT_MONTH
-                    else:
-                        bg = "transparent"
-                    ctk.CTkLabel(table, text=txt, font=FONT_SMALL, text_color=color, width=COL_W, anchor="center", fg_color=bg, corner_radius=4).grid(row=r, column=m+1, padx=1, pady=1)
-
-            saved = dm.get_cat_total_saved(sp, cat["id"])
-            missing = dm.get_cat_missing(sp, cat["id"])
-            progress = dm.get_cat_progress(sp, cat["id"])
-            spent = dm.get_savings_spent(data, cat["id"])
-            balance = saved - spent
-
-            s_lbl = ctk.CTkLabel(table, text=f"{saved:,.0f}", font=FONT_SMALL, text_color=COLOR_TEXT, width=55, anchor="center")
-            s_lbl.grid(row=r, column=13, padx=1, pady=1)
-            m_lbl = ctk.CTkLabel(table, text=f"{missing:,.0f}", font=FONT_SMALL, text_color=COLOR_WARNING if missing > 0 else COLOR_SUCCESS, width=55, anchor="center")
-            m_lbl.grid(row=r, column=14, padx=1, pady=1)
-            p_lbl = ctk.CTkLabel(table, text=f"{progress*100:.0f}%", font=FONT_SMALL, text_color=COLOR_SUCCESS if progress >= 1.0 else COLOR_TEXT, width=55, anchor="center")
-            p_lbl.grid(row=r, column=15, padx=1, pady=1)
-            sp_lbl = ctk.CTkLabel(table, text=f"{spent:,.0f}" if spent else "–", font=FONT_SMALL, text_color=COLOR_EXPENSE, width=55, anchor="center")
-            sp_lbl.grid(row=r, column=16, padx=1, pady=1)
-            b_lbl = ctk.CTkLabel(table, text=f"{balance:,.0f}", font=FONT_SMALL, text_color=COLOR_SUCCESS if balance >= 0 else COLOR_ERROR, width=55, anchor="center")
-            b_lbl.grid(row=r, column=17, padx=1, pady=1)
-            self.actual_summary_lbls[cat["id"]] = {"saved": s_lbl, "missing": m_lbl, "progress": p_lbl, "balance": b_lbl}
+            self._render_actual_cat_row(table, cat, r, actual_grid, plan_grid, sp, data, current_m)
 
         def render_group_header(group, children, r):
             collapsed = group["id"] in self.actual_collapsed
@@ -1428,17 +1471,20 @@ class SavingsView(ctk.CTkFrame):
             children = grouped_cats.get(group["id"], [])
             render_group_header(group, children, row_idx)
             row_idx += 1
-            child_widgets = []
-            for cat in children:
-                render_actual_row(cat, row_idx)
-                # Collect all widgets at this row
-                row_widgets = [w for w in table.grid_slaves(row=row_idx)]
-                child_widgets.extend(row_widgets)
-                if group["id"] in self.actual_collapsed:
-                    for w in row_widgets:
-                        w.grid_remove()
-                row_idx += 1
-            self.actual_group_children[group["id"]] = child_widgets
+            if group["id"] in self.actual_collapsed:
+                # Defer: reserve rows but don't create widgets
+                start_row = row_idx
+                row_idx += len(children)
+                self.actual_group_children[group["id"]] = []
+                self._actual_deferred[group["id"]] = (table, children, start_row)
+            else:
+                child_widgets = []
+                for cat in children:
+                    render_actual_row(cat, row_idx)
+                    row_widgets = [w for w in table.grid_slaves(row=row_idx)]
+                    child_widgets.extend(row_widgets)
+                    row_idx += 1
+                self.actual_group_children[group["id"]] = child_widgets
 
         row_idx += 1
         # Actual Available
@@ -1534,6 +1580,10 @@ class SavingsView(ctk.CTkFrame):
         self.actual_group_labels = {}
         self.planning_group_children = {}
         self.planning_group_labels = {}
+        self._planning_deferred = {}
+        self._actual_deferred = {}
+        # Single-pass cache: scan all month files once for savings spent
+        self._spent_cache = dm.build_savings_spent_cache()
         self.build_actual_table()
         ctk.CTkFrame(self.scroll, height=2, fg_color=COLOR_BORDER).pack(fill="x", pady=15)
         ctk.CTkLabel(self.scroll, text="📋 Planning Grid", font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 5))

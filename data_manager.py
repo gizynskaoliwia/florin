@@ -340,7 +340,24 @@ def get_cat_rollover(sp, cat_id, monthly_data=None):
         return balance
     return 0.0
 
-def get_cascade_adjustments(sp, cat_id):
+def build_savings_spent_cache():
+    """Single-pass scan of all month files. Returns {savings_cat_id: total_spent}."""
+    init_env()
+    cache = {}
+    for f in DATA_DIR.glob("????-??.json"):
+        try:
+            with open(f, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            for exp in data.get("expenses", []):
+                scid = exp.get("savings_category_id")
+                if scid:
+                    cache[scid] = cache.get(scid, 0.0) + exp.get("amount", 0.0)
+        except:
+            pass
+    return cache
+
+
+def get_cascade_adjustments(sp, cat_id, spent_cache=None):
     """Strict per-category surplus cascade deduction.
     
     Algorithm:
@@ -363,7 +380,7 @@ def get_cascade_adjustments(sp, cat_id):
     # Surplus = Saved up to deadline - Total Spent (post-deadline savings are for next year)
     actual_row = sp.get("actual_grid", {}).get(cat_id, {})
     total_saved = sum(actual_row.get(f"{m:02d}", 0.0) for m in range(1, deadline + 1))
-    total_spent = _get_all_months_savings_spent(cat_id)
+    total_spent = spent_cache.get(cat_id, 0.0) if spent_cache is not None else _get_all_months_savings_spent(cat_id)
     # No surplus if nothing has been spent yet (goal event hasn't occurred)
     if total_spent <= 0:
         return {}
