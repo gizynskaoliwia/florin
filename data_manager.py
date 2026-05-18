@@ -360,8 +360,9 @@ def get_cascade_adjustments(sp, cat_id):
     # Gate: target must be fully met for this category
     if get_cat_progress(sp, cat_id) < 1.0:
         return {}
-    # Surplus = Total Saved - Total Spent (for THIS category only)
-    total_saved = get_cat_total_saved(sp, cat_id)
+    # Surplus = Saved up to deadline - Total Spent (post-deadline savings are for next year)
+    actual_row = sp.get("actual_grid", {}).get(cat_id, {})
+    total_saved = sum(actual_row.get(f"{m:02d}", 0.0) for m in range(1, deadline + 1))
     total_spent = _get_all_months_savings_spent(cat_id)
     # No surplus if nothing has been spent yet (goal event hasn't occurred)
     if total_spent <= 0:

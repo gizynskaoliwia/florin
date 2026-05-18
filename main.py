@@ -1,4 +1,5 @@
 # main.py
+import tkinter as tk
 import customtkinter as ctk
 import data_manager as dm
 from theme import *
@@ -20,8 +21,14 @@ class FlorinApp(ctk.CTk):
             self.iconbitmap("logo2.ico")
         except:
             pass
-        self.geometry("1100x720")
+        self.geometry("1280x800")
+        self.minsize(900, 600)
         self.configure(fg_color=COLOR_BG)
+        # Center on screen
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - 1280) // 2
+        y = (self.winfo_screenheight() - 800) // 2
+        self.geometry(f"1280x800+{x}+{y}")
         
         # Grid layout
         self.grid_rowconfigure(0, weight=1)
@@ -434,12 +441,25 @@ class ExpensesView(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self.controller = controller
 
+        # Month filter state
+        now = datetime.now()
+        self.filter_month = now.month
+        self.filter_year = now.year
+
         # Header row
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header, text="Expenses", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(side="left")
         ctk.CTkButton(header, text="⚙ Categories", width=120, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self.open_category_manager).pack(side="right", padx=5)
         ctk.CTkButton(header, text="+ Add Expense", width=120, fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER, command=self.open_add_expense).pack(side="right", padx=5)
+
+        # Month selector
+        month_bar = ctk.CTkFrame(self, fg_color="transparent")
+        month_bar.pack(fill="x", pady=(0, 8))
+        ctk.CTkButton(month_bar, text="◀", width=30, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self._prev_month).pack(side="left")
+        self._month_label = ctk.CTkLabel(month_bar, text="", font=FONT_LABEL, text_color=COLOR_TEXT)
+        self._month_label.pack(side="left", padx=10)
+        ctk.CTkButton(month_bar, text="▶", width=30, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self._next_month).pack(side="left")
 
         # Split bucket summary strip
         self.split_strip = ctk.CTkFrame(self, fg_color="transparent")
@@ -668,6 +688,23 @@ class ExpensesView(ctk.CTkFrame):
             self.active_tag = tag
         self.refresh()
 
+    # --- Month navigation ---
+    def _prev_month(self):
+        if self.filter_month == 1:
+            self.filter_month = 12
+            self.filter_year -= 1
+        else:
+            self.filter_month -= 1
+        self.refresh()
+
+    def _next_month(self):
+        if self.filter_month == 12:
+            self.filter_month = 1
+            self.filter_year += 1
+        else:
+            self.filter_month += 1
+        self.refresh()
+
     # --- Delete expense ---
     def delete_expense(self, exp_id):
         dm.delete_expense(self.controller.data, exp_id)
@@ -677,6 +714,18 @@ class ExpensesView(ctk.CTkFrame):
     # --- Refresh / Build Table ---
     def refresh(self):
         data = self.controller.data
+
+        # Update month label
+        self._month_label.configure(text=f"{MONTH_FULL[self.filter_month - 1]} {self.filter_year}")
+
+        # Filter expenses to selected month
+        def _in_month(exp):
+            try:
+                d = datetime.strptime(exp["date"], "%d/%m/%Y")
+                return d.month == self.filter_month and d.year == self.filter_year
+            except:
+                return False
+        filtered_expenses = [e for e in data.get("expenses", []) if _in_month(e)]
 
         # Ensure expense_categories exist (migration for old data)
         if "expense_categories" not in data:
@@ -699,7 +748,7 @@ class ExpensesView(ctk.CTkFrame):
         for w in self.tag_bar.winfo_children():
             w.destroy()
         all_tags = set()
-        for exp in data.get("expenses", []):
+        for exp in filtered_expenses:
             for t in exp.get("tags", []):
                 all_tags.add(t)
         if all_tags:
@@ -721,7 +770,7 @@ class ExpensesView(ctk.CTkFrame):
 
         # If tag filter active: show flat list of matching expenses + total
         if self.active_tag:
-            filtered = [e for e in data.get("expenses", []) if self.active_tag in e.get("tags", [])]
+            filtered = [e for e in filtered_expenses if self.active_tag in e.get("tags", [])]
             total = sum(e["amount"] for e in filtered)
 
             hdr = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=12, border_width=1, border_color=COLOR_BORDER)
@@ -753,7 +802,10 @@ class ExpensesView(ctk.CTkFrame):
             return
 
         # Default: grouped by expense category (accordion)
-        grouped = dm.get_expenses_by_expense_category(data)
+        grouped = {}
+        for exp in filtered_expenses:
+            key = exp.get("expense_category_id") or "uncategorized"
+            grouped.setdefault(key, []).append(exp)
         exp_cats = {c["id"]: c["name"] for c in dm.get_expense_categories(data)}
 
         cat_order = list(exp_cats.keys())
@@ -780,7 +832,13 @@ class ExpensesView(ctk.CTkFrame):
                 child.bind("<Button-1>", lambda e, cid=cat_id: self.toggle_category(cid))
 
             # Split breakdown (always visible)
-            breakdown = dm.get_expense_category_split_breakdown(data, cat_id)
+            breakdown = {}
+            for exp in expenses:
+                if exp.get("savings_category_id"):
+                    key = f"sav:{exp['savings_category_id']}"
+                else:
+                    key = exp.get("category_id") or "unknown"
+                breakdown[key] = breakdown.get(key, 0.0) + exp["amount"]
             if breakdown:
                 sp = dm.get_savings_planner()
                 sav_cats_map = {c["id"]: c["name"] for c in sp.get("categories", [])}
@@ -829,6 +887,7 @@ class SavingsView(ctk.CTkFrame):
         self.assumed_vars = {}
         self.actual_collapsed = set()
         self.planning_collapsed = set()
+        self._user_toggled = set()
 
         # Header
         hdr = ctk.CTkFrame(self, fg_color="transparent")
@@ -839,9 +898,44 @@ class SavingsView(ctk.CTkFrame):
         self.add_cat_btn = ctk.CTkButton(hdr, text="+ Category", width=100, fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER, command=self.add_category_dialog)
         self.add_grp_btn = ctk.CTkButton(hdr, text="+ Group", width=80, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self.add_group_dialog)
 
-        # Scrollable grid area
-        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", orientation="horizontal")
-        self.scroll.pack(fill="both", expand=True)
+        # Dual-scroll container (vertical + horizontal)
+        self._scroll_container = ctk.CTkFrame(self, fg_color="transparent")
+        self._scroll_container.pack(fill="both", expand=True)
+        self._scroll_container.grid_rowconfigure(0, weight=1)
+        self._scroll_container.grid_columnconfigure(0, weight=1)
+
+        self._canvas = tk.Canvas(self._scroll_container, highlightthickness=0, bg=COLOR_BG)
+        self._v_scroll = ctk.CTkScrollbar(self._scroll_container, command=self._canvas.yview)
+        self._h_scroll = ctk.CTkScrollbar(self._scroll_container, orientation="horizontal", command=self._canvas.xview)
+        self._canvas.configure(yscrollcommand=self._v_scroll.set, xscrollcommand=self._h_scroll.set)
+
+        self._canvas.grid(row=0, column=0, sticky="nsew")
+        self._v_scroll.grid(row=0, column=1, sticky="ns")
+        self._h_scroll.grid(row=1, column=0, sticky="ew")
+
+        self.scroll = ctk.CTkFrame(self._canvas, fg_color="transparent")
+        self._canvas_window = self._canvas.create_window((0, 0), window=self.scroll, anchor="nw")
+
+        def _update_scroll_width():
+            req = self.scroll.winfo_reqwidth()
+            canvas_w = self._canvas.winfo_width()
+            if req <= canvas_w:
+                self._canvas.itemconfig(self._canvas_window, width=canvas_w)
+            else:
+                self._canvas.itemconfig(self._canvas_window, width=0)
+
+        def _on_configure(e):
+            self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+            _update_scroll_width()
+        self.scroll.bind("<Configure>", _on_configure)
+
+        def _on_canvas_configure(e):
+            _update_scroll_width()
+        self._canvas.bind("<Configure>", _on_canvas_configure)
+
+        def _on_mousewheel(e):
+            self._canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        self._canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     def toggle_edit(self):
         if self.editing:
@@ -1020,15 +1114,19 @@ class SavingsView(ctk.CTkFrame):
         assumed = sp.get("assumed", {})
 
         table = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        table.pack(fill="both", expand=True)
+        table.pack(anchor="nw")
 
         COL_W = 60
         NAME_W = 150
 
         # Header row
         ctk.CTkLabel(table, text="Category", font=FONT_LABEL, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=0, column=0, padx=2, pady=2, sticky="w")
+        current_m = datetime.now().month
         for m in range(12):
-            ctk.CTkLabel(table, text=MONTH_LABELS[m], font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=COL_W, anchor="center").grid(row=0, column=m+1, padx=1, pady=2)
+            is_current = (m + 1 == current_m)
+            hdr_bg = COLOR_CURRENT_MONTH if is_current else "transparent"
+            hdr_color = COLOR_PRIMARY if is_current else COLOR_TEXT_MUTED
+            ctk.CTkLabel(table, text=MONTH_LABELS[m], font=FONT_LABEL, text_color=hdr_color, width=COL_W, anchor="center", fg_color=hdr_bg, corner_radius=4).grid(row=0, column=m+1, padx=1, pady=2)
         ctk.CTkLabel(table, text="Progress", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=100, anchor="center").grid(row=0, column=13, padx=2, pady=2)
 
         row_idx = 1
@@ -1079,7 +1177,13 @@ class SavingsView(ctk.CTkFrame):
                         ctk.CTkLabel(cell_frame, text=f"{adjusted:,.0f}", font=("Segoe UI", 9, "bold"), text_color=COLOR_WARNING, height=12).grid(row=1, column=0)
                     else:
                         txt = f"{val:,.0f}" if val else "–"
-                        bg = cell_bg if is_deadline else "transparent"
+                        is_current = (m + 1 == current_m)
+                        if is_deadline:
+                            bg = COLOR_ACCENT
+                        elif is_current:
+                            bg = COLOR_CURRENT_MONTH
+                        else:
+                            bg = "transparent"
                         ctk.CTkLabel(table, text=txt, font=FONT_SMALL, text_color=COLOR_TEXT, width=COL_W, anchor="center", fg_color=bg, corner_radius=4).grid(row=r, column=m+1, padx=1, pady=1)
 
             deadline = cat.get("deadline_month", 12)
@@ -1094,10 +1198,16 @@ class SavingsView(ctk.CTkFrame):
             lbl = ctk.CTkLabel(table, text=f"{chevron} {group['name']}", font=FONT_LABEL, text_color=COLOR_PRIMARY, width=NAME_W, anchor="w", cursor="hand2")
             lbl.grid(row=r, column=0, padx=2, pady=(6, 1), sticky="w")
             lbl.bind("<Button-1>", lambda e, gid=group["id"]: self.toggle_planning_group(gid))
+            self.planning_group_labels[group["id"]] = lbl
             children = [c for c in categories if c.get("group_id") == group["id"]]
+            # Pre-compute cascade adjustments for each child
+            child_cascades = {c["id"]: dm.get_cascade_adjustments(sp, c["id"]) for c in children}
             for m in range(12):
                 mk = f"{m+1:02d}"
-                total = sum(grid.get(c["id"], {}).get(mk, 0.0) for c in children)
+                total = 0.0
+                for c in children:
+                    raw = grid.get(c["id"], {}).get(mk, 0.0)
+                    total += child_cascades[c["id"]].get(mk, raw)
                 lbl = ctk.CTkLabel(table, text=f"{total:,.0f}", font=FONT_SMALL, text_color=COLOR_PRIMARY, width=COL_W, anchor="center")
                 lbl.grid(row=r, column=m+1, padx=1, pady=(6, 1))
                 self.group_lbls[(group["id"], mk)] = lbl
@@ -1109,10 +1219,16 @@ class SavingsView(ctk.CTkFrame):
         for group in groups:
             render_group_row(group, row_idx)
             row_idx += 1
-            if group["id"] not in self.planning_collapsed:
-                for cat in grouped_cats.get(group["id"], []):
-                    render_cat_row(cat, row_idx)
-                    row_idx += 1
+            child_widgets = []
+            for cat in grouped_cats.get(group["id"], []):
+                render_cat_row(cat, row_idx)
+                row_widgets = [w for w in table.grid_slaves(row=row_idx)]
+                child_widgets.extend(row_widgets)
+                if group["id"] in self.planning_collapsed:
+                    for w in row_widgets:
+                        w.grid_remove()
+                row_idx += 1
+            self.planning_group_children[group["id"]] = child_widgets
 
         row_idx += 1
 
@@ -1154,12 +1270,35 @@ class SavingsView(ctk.CTkFrame):
             self.remain_lbls[mk] = lbl
 
     def toggle_actual_group(self, group_id):
+        self._user_toggled.add(group_id)
         self.actual_collapsed.discard(group_id) if group_id in self.actual_collapsed else self.actual_collapsed.add(group_id)
-        self._rebuild_ui()
+        collapsed = group_id in self.actual_collapsed
+        # Toggle visibility of child row widgets
+        for widget in self.actual_group_children.get(group_id, []):
+            if collapsed:
+                widget.grid_remove()
+            else:
+                widget.grid()
+        # Update chevron label
+        if group_id in self.actual_group_labels:
+            self.actual_group_labels[group_id].configure(text=f"{'▶' if collapsed else '▼'} {self._get_group_name(group_id)}")
 
     def toggle_planning_group(self, group_id):
+        self._user_toggled.add(group_id)
         self.planning_collapsed.discard(group_id) if group_id in self.planning_collapsed else self.planning_collapsed.add(group_id)
-        self._rebuild_ui()
+        collapsed = group_id in self.planning_collapsed
+        # Toggle visibility of child row widgets
+        for widget in self.planning_group_children.get(group_id, []):
+            if collapsed:
+                widget.grid_remove()
+            else:
+                widget.grid()
+        # Update chevron label
+        if group_id in self.planning_group_labels:
+            self.planning_group_labels[group_id].configure(text=f"{'▶' if collapsed else '▼'} {self._get_group_name(group_id)}")
+
+    def _get_group_name(self, group_id):
+        return next((g["name"] for g in self.sp.get("groups", []) if g["id"] == group_id), "")
 
     def build_actual_table(self):
         """Render actual savings tracker table (top section)."""
@@ -1173,14 +1312,18 @@ class SavingsView(ctk.CTkFrame):
 
         ctk.CTkLabel(self.scroll, text="📊 Actual Savings", font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 5))
         table = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        table.pack(fill="x")
+        table.pack(anchor="nw")
 
         COL_W = 60
         NAME_W = 150
 
         ctk.CTkLabel(table, text="Category", font=FONT_LABEL, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=0, column=0, padx=2, pady=2, sticky="w")
+        current_m = datetime.now().month
         for m in range(12):
-            ctk.CTkLabel(table, text=MONTH_LABELS[m], font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=COL_W, anchor="center").grid(row=0, column=m+1, padx=1, pady=2)
+            is_current = (m + 1 == current_m)
+            hdr_bg = COLOR_CURRENT_MONTH if is_current else "transparent"
+            hdr_color = COLOR_PRIMARY if is_current else COLOR_TEXT_MUTED
+            ctk.CTkLabel(table, text=MONTH_LABELS[m], font=FONT_LABEL, text_color=hdr_color, width=COL_W, anchor="center", fg_color=hdr_bg, corner_radius=4).grid(row=0, column=m+1, padx=1, pady=2)
         for i, h in enumerate(["Saved", "Missing", "%", "Spent", "Balance"]):
             ctk.CTkLabel(table, text=h, font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=55, anchor="center").grid(row=0, column=13+i, padx=1, pady=2)
 
@@ -1212,9 +1355,27 @@ class SavingsView(ctk.CTkFrame):
                     e.bind("<KeyRelease>", lambda ev, cid=cat["id"], mk_=mk, v=var: self._on_actual_cell(cid, mk_, v))
                     e.bind("<FocusOut>", lambda ev, cid=cat["id"], mk_=mk, v=var: self._on_actual_cell_save(cid, mk_, v))
                 else:
-                    color = COLOR_SUCCESS if val and planned and val >= planned else (COLOR_ERROR if val and planned and val < planned else COLOR_TEXT)
+                    # Subtle plan vs actual comparison (text color only)
+                    if val and planned:
+                        if val > planned:
+                            color = COLOR_OVER_PLAN
+                        elif val >= planned:
+                            color = COLOR_MET_PLAN
+                        else:
+                            color = COLOR_UNDER_PLAN
+                    elif val:
+                        color = COLOR_TEXT
+                    else:
+                        color = COLOR_TEXT_MUTED
                     txt = f"{val:,.0f}" if val else "–"
-                    bg = cell_bg if is_deadline else "transparent"
+                    # Background: deadline > current month > transparent
+                    is_current = (m + 1 == current_m)
+                    if is_deadline:
+                        bg = COLOR_ACCENT
+                    elif is_current:
+                        bg = COLOR_CURRENT_MONTH
+                    else:
+                        bg = "transparent"
                     ctk.CTkLabel(table, text=txt, font=FONT_SMALL, text_color=color, width=COL_W, anchor="center", fg_color=bg, corner_radius=4).grid(row=r, column=m+1, padx=1, pady=1)
 
             saved = dm.get_cat_total_saved(sp, cat["id"])
@@ -1241,6 +1402,7 @@ class SavingsView(ctk.CTkFrame):
             lbl = ctk.CTkLabel(table, text=f"{chevron} {group['name']}", font=FONT_LABEL, text_color=COLOR_PRIMARY, width=NAME_W, anchor="w", cursor="hand2")
             lbl.grid(row=r, column=0, padx=2, pady=(6, 1), sticky="w")
             lbl.bind("<Button-1>", lambda e, gid=group["id"]: self.toggle_actual_group(gid))
+            self.actual_group_labels[group["id"]] = lbl
             # Monthly sums for group
             for m in range(12):
                 mk = f"{m+1:02d}"
@@ -1266,10 +1428,17 @@ class SavingsView(ctk.CTkFrame):
             children = grouped_cats.get(group["id"], [])
             render_group_header(group, children, row_idx)
             row_idx += 1
-            if group["id"] not in self.actual_collapsed:
-                for cat in children:
-                    render_actual_row(cat, row_idx)
-                    row_idx += 1
+            child_widgets = []
+            for cat in children:
+                render_actual_row(cat, row_idx)
+                # Collect all widgets at this row
+                row_widgets = [w for w in table.grid_slaves(row=row_idx)]
+                child_widgets.extend(row_widgets)
+                if group["id"] in self.actual_collapsed:
+                    for w in row_widgets:
+                        w.grid_remove()
+                row_idx += 1
+            self.actual_group_children[group["id"]] = child_widgets
 
         row_idx += 1
         # Actual Available
@@ -1361,6 +1530,10 @@ class SavingsView(ctk.CTkFrame):
         self.actual_summary_lbls = {}
         self.actual_alloc_lbls = {}
         self.actual_remain_lbls = {}
+        self.actual_group_children = {}
+        self.actual_group_labels = {}
+        self.planning_group_children = {}
+        self.planning_group_labels = {}
         self.build_actual_table()
         ctk.CTkFrame(self.scroll, height=2, fg_color=COLOR_BORDER).pack(fill="x", pady=15)
         ctk.CTkLabel(self.scroll, text="📋 Planning Grid", font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 5))
@@ -1369,6 +1542,13 @@ class SavingsView(ctk.CTkFrame):
     def refresh(self):
         self.sp = dm.get_savings_planner()
         dm.get_savings_actual(self.sp)
+        # Default all groups to collapsed on first load
+        all_group_ids = {g["id"] for g in self.sp.get("groups", [])}
+        # Only set defaults for groups not yet interacted with
+        for gid in all_group_ids:
+            if gid not in self._user_toggled:
+                self.actual_collapsed.add(gid)
+                self.planning_collapsed.add(gid)
         self._rebuild_ui()
 
 

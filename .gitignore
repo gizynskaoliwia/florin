@@ -28,3 +28,9 @@ create_shortcut.ps1
 # OS junk
 .DS_Store
 Thumbs.db
+
+# agents
+.agents
+.kiro
+.qwen
+skills-lock.json

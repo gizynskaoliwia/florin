@@ -19,6 +19,14 @@ COLOR_ERROR = "#C96B6B"
 COLOR_INCOME = "#5A9E8A"
 COLOR_EXPENSE = "#C96B80"
 
+# Subtle comparison tints (text colors)
+COLOR_MET_PLAN = "#6BAD8A"       # subtle green - actual == planned
+COLOR_UNDER_PLAN = "#D4955A"     # subtle orange - actual < planned
+COLOR_OVER_PLAN = "#5A8EC9"      # subtle blue/teal - actual > planned
+
+# Current month column highlight
+COLOR_CURRENT_MONTH = "#F5E6F0"  # very light primary tint
+
 # Category Colors
 CATEGORY_COLORS = {
     "daily_life": "#C9A86B",
