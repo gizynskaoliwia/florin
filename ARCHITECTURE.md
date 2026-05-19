@@ -59,116 +59,75 @@ florin/
 
 ## 3. Data Layer
 
-### Storage Location
+### Why SQLite
 
-All data lives in `./data/` (auto-created on first run). Config lives at `./config.json`.
+- **Performance:** Single indexed database vs scanning multiple JSON files. `build_savings_spent_cache()` is now a single SQL query instead of opening every month file.
+- **Reliability:** ACID transactions prevent data corruption from crashes mid-write.
+- **Simplicity:** No external dependencies — SQLite ships with Python's standard library.
+- **Local-first:** No network, no cloud, no costs. Each user has their own database file.
+- **No Firestore/cloud:** Explicitly avoids any cloud database to keep the app free and private.
 
-### File Schemas
+### Database Location
 
-#### `config.json` — App Configuration
+| OS | Path |
+|----|------|
+| Windows | `%LOCALAPPDATA%\Florin\florin.db` (e.g. `C:\Users\<name>\AppData\Local\Florin\florin.db`) |
+| macOS | `~/Library/Application Support/Florin/florin.db` |
+| Linux | `~/.local/share/florin/florin.db` |
 
-```json
-{
-  "last_month": "2026-05",
-  "theme": "light",
-  "business_defaults": { "vat": 0.0, "tax": 0.0, "zus": 0.0 },
-  "cashflow_targets": [
-    { "id": "uuid", "name": "Daily Life", "target": 2000.0 }
-  ],
-  "default_income_items": [
-    { "id": "uuid", "name": "Gross Invoice", "type": "addition|deduction" }
-  ]
-}
+Each installation has its own independent database. Multiple users on different machines each get their own local data — no sync, no shared state.
+
+### Schema
+
+```
+settings              — key/value store (theme, language, last_month)
+cashflow_targets      — managed in Settings (id, name, target, sort_order)
+default_income_items  — templates for new months (id, name, type, sort_order)
+categories            — income split categories per month (id, month, name, percent, color)
+expense_categories    — expense categories per month (id, month, name)
+income_items          — income entries per month (id, month, name, amount, type, category_id)
+expenses              — expense entries per month (id, month, date, amount, category_id, expense_category_id, savings_category_id, description, tags)
+cashflow              — cashflow data per month (month, key, value, updated_at)
+savings_groups        — savings group definitions (id, name)
+savings_categories    — savings category definitions (id, name, target, deadline_month, group_id, next_year_target)
+savings_grid          — planned amounts (category_id, month_key, amount)
+savings_assumed       — assumed available per month (month_key, amount)
+savings_actual_grid   — actual saved amounts (category_id, month_key, amount)
+savings_actual_available — actual available per month (month_key, amount)
+savings_spent         — spent tracking per category (category_id, amount)
+migrations            — tracks applied migrations (id, name, applied_at)
 ```
 
-#### `data/YYYY-MM.json` — Monthly Data
+### Migration from JSON Files
 
-```json
-{
-  "month": "2026-05",
-  "income_items": [
-    {
-      "id": "uuid",
-      "name": "Gross Invoice",
-      "amount": 15984.81,
-      "type": "addition|deduction",
-      "category_id": null | "split_category_id"
-    }
-  ],
-  "categories": [
-    { "id": "daily_life", "name": "Daily Life", "percent": 40.0, "color": "#C9A86B" }
-  ],
-  "expense_categories": [
-    { "id": "uuid|slug", "name": "Groceries" }
-  ],
-  "expenses": [
-    {
-      "id": "uuid",
-      "date": "DD/MM/YYYY",
-      "amount": 200.0,
-      "category_id": "split_category_id" | null,
-      "expense_category_id": "uuid",
-      "description": "",
-      "tags": [],
-      "savings_category_id": "uuid" | null
-    }
-  ],
-  "cashflow": {
-    "current_accounts": {
-      "target_id": { "balance": 0.0, "updated_at": "" }
-    },
-    "shared_actual": 0.0,
-    "shared_assumed": 0.0,
-    "saved_assumed": 0.0
-  }
-}
-```
+On first run after upgrade, `migrate.py` automatically:
+1. Reads `config.json` → populates `settings`, `cashflow_targets`, `default_income_items`
+2. Reads each `data/YYYY-MM.json` → populates monthly tables
+3. Reads `data/savings_planner.json` → populates all `savings_*` tables
+4. Records migration in `migrations` table (idempotent — won't run twice)
 
-#### `data/savings_planner.json` — Savings Planner
-
-```json
-{
-  "year": 2026,
-  "categories": [
-    {
-      "id": "uuid",
-      "name": "Category Name",
-      "target": 1450.0,
-      "deadline_month": 1,
-      "group_id": "uuid" | null,
-      "next_year_target": 200.0 | null
-    }
-  ],
-  "groups": [
-    { "id": "uuid", "name": "Group Name" }
-  ],
-  "grid": {
-    "cat_id": { "01": 100.0, "02": 100.0, ... "12": 0.0 }
-  },
-  "assumed": { "01": 3000.0, ... "12": 3000.0 },
-  "actual_grid": {
-    "cat_id": { "01": 200.0, "02": 18.0, ... }
-  },
-  "actual_available": { "01": 3000.0, ... }
-}
-```
+Old JSON files are left in place as backup.
 
 ### Read/Write Patterns
 
 | Operation | What Happens |
 |-----------|-------------|
-| App startup | Read `config.json`, read/create current month file |
-| Tab switch | `view.refresh()` called — re-reads relevant data |
-| Savings tab open | Read `savings_planner.json` + single-pass scan of ALL month files (for spent cache) |
-| User edits cell | In-memory update → `save_savings_planner()` writes full JSON |
-| Add expense | Append to in-memory list → `save_month()` writes full JSON |
-| Month navigation | Load different `YYYY-MM.json` |
+| App startup | `init_env()` → run migration if needed, load config from DB |
+| Tab switch | `view.refresh()` → re-reads from SQLite |
+| Savings tab open | Single SQL query for spent cache (replaces N file reads) |
+| User edits cell | In-memory update → `save_savings_planner()` writes to DB |
+| Add expense | Append to in-memory list → `save_month()` writes to DB |
+| Month navigation | `load_month()` queries SQLite |
 
 ### Caching Strategy
 
-- `build_savings_spent_cache()`: Single-pass scan of all month files, returns `{cat_id: total_spent}`. Built once per `_rebuild_ui()` call, stored as `self._spent_cache`.
-- Monthly data (`self.data`): Held in memory on `FlorinApp` controller, written on every change.
-- Savings planner (`self.sp`): Held in memory on `SavingsView`, re-read from disk on `refresh()`.
+- `build_savings_spent_cache()`: Single SQL `GROUP BY` query, returns `{cat_id: total_spent}`. Built once per `_rebuild_ui()`.
+- Monthly data (`self.data`): Held in memory, written on every change via `save_month()`.
+- Savings planner (`self.sp`): Held in memory on `SavingsView`, re-read from DB on `refresh()`.
+
+### Separate Local Datasets
+
+Each device/user gets an independent SQLite file at the OS-appropriate path. No login system, no sync. If a second person uses the app on their own machine, they automatically get their own database.
 
 ---
 

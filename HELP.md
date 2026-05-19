@@ -240,3 +240,56 @@ Yes! You can type either `1234.56` or `1234,56` — Florin converts commas to do
 ### What currency does Florin use?
 
 Florin displays amounts in PLN (Polish Złoty) but doesn't enforce any currency. The numbers work the same regardless of what currency you use mentally.
+
+
+---
+
+## Running Florin
+
+### On Windows
+
+1. Install Python 3.10 or newer from [python.org](https://www.python.org/downloads/)
+2. Open a terminal (Command Prompt or PowerShell)
+3. Navigate to the Florin folder: `cd path\to\florin`
+4. Install dependencies: `pip install -r requirements.txt`
+5. Run the app: `python main.py`
+
+**Tip:** You can also double-click `main.py` if Python is associated with `.py` files, or use the included `create_shortcut.ps1` script to make a desktop shortcut.
+
+### On macOS
+
+1. Install Python 3.10 or newer (via [python.org](https://www.python.org/downloads/) or `brew install python`)
+2. Open Terminal
+3. Navigate to the Florin folder: `cd path/to/florin`
+4. Install dependencies: `pip3 install -r requirements.txt`
+5. Run the app: `python3 main.py`
+
+---
+
+## Where Is My Data Stored?
+
+Florin stores all your data in a local database file on your computer. Nothing is sent to the internet.
+
+| Operating System | Database Location |
+|-----------------|-------------------|
+| Windows | `C:\Users\<YourName>\AppData\Local\Florin\florin.db` |
+| macOS | `~/Library/Application Support/Florin/florin.db` |
+
+### Can multiple people use Florin?
+
+Yes! Each person uses Florin independently on their own computer. Your data is completely separate — there's no shared account or cloud sync.
+
+If your partner also wants to use Florin, they simply install it on their own machine and get their own private database automatically.
+
+### What about my old data?
+
+If you previously used Florin with JSON files (in the `data/` folder), the app automatically migrates your data to the new database on first launch. Your old files are kept as backup — you can delete them once you've confirmed everything works.
+
+### Backing up your data
+
+To back up your data, copy the database file to a safe location:
+
+- **Windows:** Copy `C:\Users\<YourName>\AppData\Local\Florin\florin.db`
+- **macOS:** Copy `~/Library/Application Support/Florin/florin.db`
+
+Store the copy on a USB drive, cloud backup folder, or anywhere safe.
