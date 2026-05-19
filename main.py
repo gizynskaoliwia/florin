@@ -981,12 +981,29 @@ class SavingsView(ctk.CTkFrame):
 
         ctk.CTkLabel(dialog, text="Group (optional):", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
         groups = self.sp.get("groups", [])
-        group_names = ["None"] + [g["name"] for g in groups]
+        group_names = sorted(["None"] + [g["name"] for g in groups], key=str.casefold) + ["+ New group..."]
         group_var = ctk.StringVar(value="None")
         if cat and cat.get("group_id"):
             cur_g = next((g["name"] for g in groups if g["id"] == cat["group_id"]), "None")
             group_var.set(cur_g)
-        ctk.CTkOptionMenu(dialog, values=group_names, variable=group_var).pack(fill="x", padx=20)
+        group_menu = ctk.CTkOptionMenu(dialog, values=group_names, variable=group_var)
+        group_menu.pack(fill="x", padx=20)
+
+        def _on_group_select(val):
+            if val == "+ New group...":
+                new_name = ctk.CTkInputDialog(text="Group name:", title="New Group").get_input()
+                if new_name and new_name.strip():
+                    new_name = new_name.strip()
+                    g = dm.add_savings_group(self.sp, new_name)
+                    dm.save_savings_planner(self.sp)
+                    groups.append(g)
+                    updated = sorted(["None"] + [g2["name"] for g2 in groups], key=str.casefold) + ["+ New group..."]
+                    group_menu.configure(values=updated)
+                    group_var.set(new_name)
+                else:
+                    group_var.set("None")
+
+        group_menu.configure(command=_on_group_select)
 
         ctk.CTkLabel(dialog, text="Next Year Target (optional):", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
         nyt_e = ctk.CTkEntry(dialog)
