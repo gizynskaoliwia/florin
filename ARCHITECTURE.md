@@ -405,6 +405,18 @@ SavingsView (CTkFrame)
 ### Accordion Groups
 
 - Groups default to **collapsed** on first load (unless user has toggled them)
+
+### Display Ordering
+
+All list-based UI elements are sorted alphabetically (case-insensitive) at render time:
+
+- **Expense category dropdown:** sorted by name
+- **Funding source dropdown:** sorted by name within each section (💰 split categories, 🎯 savings categories)
+- **Savings groups:** sorted by group name
+- **Savings categories within groups:** sorted by category name
+- **Ungrouped savings categories:** sorted by name
+
+Sorting is applied to display copies only — underlying data structures retain insertion order.
 - `self._user_toggled` tracks which groups user has interacted with
 - Collapsed groups use **deferred widget creation** — no widgets built until first expand
 - On first expand: `_render_actual_cat_row()` / `_render_planning_cat_row()` builds widgets, stores in `*_group_children[gid]`

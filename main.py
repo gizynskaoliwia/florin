@@ -529,7 +529,7 @@ class ExpensesView(ctk.CTkFrame):
         # Expense Category with inline creation
         ctk.CTkLabel(dialog, text="Expense Category:", anchor="w").pack(fill="x", padx=20, pady=(10, 3))
         exp_cats = dm.get_expense_categories(data)
-        exp_cat_names = [c["name"] for c in exp_cats] + ["+ Create new category..."]
+        exp_cat_names = sorted([c["name"] for c in exp_cats], key=str.casefold) + ["+ Create new category..."]
         if not exp_cats:
             exp_cat_names = ["(none)", "+ Create new category..."]
         exp_cat_var = ctk.StringVar(value=exp_cat_names[0])
@@ -544,7 +544,7 @@ class ExpensesView(ctk.CTkFrame):
         split_cats = data.get("categories", [])
         sp = dm.get_savings_planner()
         sav_cats = sp.get("categories", [])
-        source_names = [f"💰 {c['name']}" for c in split_cats] + [f"🎯 {c['name']}" for c in sav_cats]
+        source_names = sorted([f"💰 {c['name']}" for c in split_cats], key=str.casefold) + sorted([f"🎯 {c['name']}" for c in sav_cats], key=str.casefold)
         if not source_names:
             source_names = ["(none)"]
         source_var = ctk.StringVar(value=source_names[0])
@@ -1198,6 +1198,9 @@ class SavingsView(ctk.CTkFrame):
                 grouped_cats.setdefault(gid, []).append(cat)
             else:
                 ungrouped.append(cat)
+        ungrouped.sort(key=lambda c: c["name"].casefold())
+        for gid in grouped_cats:
+            grouped_cats[gid].sort(key=lambda c: c["name"].casefold())
 
         def render_cat_row(cat, r):
             self._render_planning_cat_row(table, cat, r, grid, all_cascades, current_m)
@@ -1226,7 +1229,7 @@ class SavingsView(ctk.CTkFrame):
             render_cat_row(cat, row_idx)
             row_idx += 1
 
-        for group in groups:
+        for group in sorted(groups, key=lambda g: g["name"].casefold()):
             render_group_row(group, row_idx)
             row_idx += 1
             cats_in_group = grouped_cats.get(group["id"], [])
@@ -1438,6 +1441,9 @@ class SavingsView(ctk.CTkFrame):
                 grouped_cats.setdefault(cat["group_id"], []).append(cat)
             else:
                 ungrouped.append(cat)
+        ungrouped.sort(key=lambda c: c["name"].casefold())
+        for gid in grouped_cats:
+            grouped_cats[gid].sort(key=lambda c: c["name"].casefold())
 
         def render_actual_row(cat, r):
             self._render_actual_cat_row(table, cat, r, actual_grid, plan_grid, sp, data, current_m)
@@ -1470,7 +1476,7 @@ class SavingsView(ctk.CTkFrame):
         for cat in ungrouped:
             render_actual_row(cat, row_idx)
             row_idx += 1
-        for group in groups:
+        for group in sorted(groups, key=lambda g: g["name"].casefold()):
             children = grouped_cats.get(group["id"], [])
             render_group_header(group, children, row_idx)
             row_idx += 1
@@ -1745,6 +1751,9 @@ class SavingsActualView(ctk.CTkFrame):
                 grouped_cats.setdefault(gid, []).append(cat)
             else:
                 ungrouped.append(cat)
+        ungrouped.sort(key=lambda c: c["name"].casefold())
+        for gid in grouped_cats:
+            grouped_cats[gid].sort(key=lambda c: c["name"].casefold())
 
         def render_cat_row(cat, r):
             ctk.CTkLabel(table, text=cat["name"], font=FONT_BODY, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=r, column=0, padx=2, pady=1, sticky="w")
@@ -1823,7 +1832,7 @@ class SavingsActualView(ctk.CTkFrame):
         for cat in ungrouped:
             render_cat_row(cat, row_idx)
             row_idx += 1
-        for group in groups:
+        for group in sorted(groups, key=lambda g: g["name"].casefold()):
             render_group_row(group, row_idx)
             row_idx += 1
             for cat in grouped_cats.get(group["id"], []):
