@@ -1099,8 +1099,13 @@ class SavingsView(ctk.CTkFrame):
                 color = COLOR_SUCCESS if remaining >= 0 else COLOR_ERROR
                 self.remain_lbls[mk].configure(text=f"{remaining:,.0f}", text_color=color)
         if hasattr(self, 'group_lbls'):
+            _grouped = {}
+            for c in self.sp["categories"]:
+                gid = c.get("group_id")
+                if gid:
+                    _grouped.setdefault(gid, []).append(c)
             for (gid, mk), lbl in self.group_lbls.items():
-                children = [c for c in self.sp["categories"] if c.get("group_id") == gid]
+                children = _grouped.get(gid, [])
                 total = sum(self.sp.get("grid", {}).get(c["id"], {}).get(mk, 0.0) for c in children)
                 lbl.configure(text=f"{total:,.0f}")
         if hasattr(self, 'cat_total_lbls'):
@@ -1212,7 +1217,7 @@ class SavingsView(ctk.CTkFrame):
             lbl.grid(row=r, column=0, padx=2, pady=(6, 1), sticky="w")
             lbl.bind("<Button-1>", lambda e, gid=group["id"]: self.toggle_planning_group(gid))
             self.planning_group_labels[group["id"]] = lbl
-            children = [c for c in categories if c.get("group_id") == group["id"]]
+            children = grouped_cats.get(group["id"], [])
             # Use pre-computed cascade adjustments for each child
             child_cascades = {c["id"]: all_cascades.get(c["id"], {}) for c in children}
             for m in range(12):
@@ -1823,7 +1828,7 @@ class SavingsActualView(ctk.CTkFrame):
 
         def render_group_row(group, r):
             ctk.CTkLabel(table, text=f"▸ {group['name']}", font=FONT_LABEL, text_color=COLOR_PRIMARY, width=NAME_W, anchor="w").grid(row=r, column=0, padx=2, pady=(6, 1), sticky="w")
-            children = [c for c in categories if c.get("group_id") == group["id"]]
+            children = grouped_cats.get(group["id"], [])
             for m in range(12):
                 mk = f"{m+1:02d}"
                 total = sum(actual_grid.get(c["id"], {}).get(mk, 0.0) for c in children)
