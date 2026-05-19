@@ -36,9 +36,11 @@ No build step. No database. No network required.
 
 ```
 florin/
-├── main.py                  # App entry point + ALL UI views (~2200 lines)
+├── main.py                  # App entry point + ALL UI views (~2400 lines)
 ├── data_manager.py          # All data I/O, CRUD, calculations (~600 lines)
 ├── theme.py                 # Color constants, font definitions, theme setup
+├── i18n.py                  # Internationalization: t() string lookup, language switching
+├── HELP.md                  # User-facing help documentation (rendered in Help tab)
 ├── requirements.txt         # Python dependencies (5 packages)
 ├── config.json              # App config: targets, defaults, last month (gitignored)
 ├── ARCHITECTURE.md          # This file
@@ -209,6 +211,13 @@ All data lives in `./data/` (auto-created on first run). Config lives at `./conf
 | `_get_all_months_savings_spent(cat_id)` | Legacy per-category scan (fallback if no cache) |
 | `load_xlsx()` | Import from Excel (stub/MVP) |
 
+### `i18n.py` — Internationalization
+
+| Function | Responsibility |
+|----------|---------------|
+| `t(key)` | Look up translated string by key, fallback to English then key itself |
+| `set_language(lang)` | Switch active language (for future use) |
+
 ### `main.py` — UI Layer
 
 | Class | Responsibility |
@@ -222,6 +231,7 @@ All data lives in `./data/` (auto-created on first run). Config lives at `./conf
 | `CashFlowView` | Buffer targets, current balances, top-up calculator |
 | `HistoryView` | Monthly archive (placeholder) |
 | `SettingsView` | Default income items, cashflow targets config |
+| `HelpView` | Renders HELP.md as formatted text with search filtering |
 
 #### Key `SavingsView` Methods
 
