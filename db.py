@@ -78,19 +78,21 @@ CREATE TABLE IF NOT EXISTS default_income_items (
 
 -- Income split categories (per month: Daily Life, Shared, Saved, Pleasure, etc.)
 CREATE TABLE IF NOT EXISTS categories (
-    id TEXT PRIMARY KEY,
+    id TEXT NOT NULL,
     month TEXT NOT NULL,
     name TEXT NOT NULL,
     percent REAL NOT NULL DEFAULT 0.0,
-    color TEXT NOT NULL DEFAULT '#888888'
+    color TEXT NOT NULL DEFAULT '#888888',
+    PRIMARY KEY (id, month)
 );
 CREATE INDEX IF NOT EXISTS idx_categories_month ON categories(month);
 
 -- Expense categories (per month)
 CREATE TABLE IF NOT EXISTS expense_categories (
-    id TEXT PRIMARY KEY,
+    id TEXT NOT NULL,
     month TEXT NOT NULL,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    PRIMARY KEY (id, month)
 );
 CREATE INDEX IF NOT EXISTS idx_expense_categories_month ON expense_categories(month);
 
