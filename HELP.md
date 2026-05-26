@@ -258,11 +258,10 @@ Florin displays amounts in PLN (Polish Złoty) but doesn't enforce any currency.
 
 ### On macOS
 
-1. Install Python 3.10 or newer (via [python.org](https://www.python.org/downloads/) or `brew install python`)
-2. Open Terminal
-3. Navigate to the Florin folder: `cd path/to/florin`
-4. Install dependencies: `pip3 install -r requirements.txt`
-5. Run the app: `python3 main.py`
+1. Install Python 3.10 or newer (via [python.org](https://www.python.org/downloads/) or `brew install python`).
+2. Double-click the `run_on_mac.command` file in the Florin folder. This will automatically set up the virtual environment, install dependencies, and launch the app.
+
+*(If macOS complains about the file being from an unidentified developer, right-click the file, select **Open**, and confirm).*
 
 ---
 

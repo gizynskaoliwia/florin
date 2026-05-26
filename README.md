@@ -54,7 +54,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
-> **Windows users:** You can also double-click `main.py` if Python is associated with `.py` files, or create a shortcut to `pythonw.exe main.py` for a clean launch without a terminal window.
+> **Windows users:** You can double-click `main.py` if Python is associated with `.py` files, or create a shortcut to `pythonw.exe main.py` for a clean launch without a terminal window.
+> 
+> **macOS users:** Simply double-click `run_on_mac.command` to automatically set up the environment and launch the app (requires Python 3).
 
 ---
 
