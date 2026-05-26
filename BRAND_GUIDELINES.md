@@ -7,35 +7,34 @@
 ## 1. App Identity & Purpose
 
 **Name:** Florin  
-**Meaning:** The name refers to the florin — a historic gold coin minted in Florence starting in 1252.  
+**Meaning:** Historic gold coin minted in Florence starting in 1252.  
 **Tagline:** *Rise above your finances.*  
-**Purpose:** Florin is a desktop personal finance application designed for comprehensive expense tracking, income management, and savings planning.  
-**Personality:** Soft, feminine, calm, organized, empowering  
-**Audience:** Young professional woman, detail-oriented, aesthetic-driven  
-**Tone:** Warm, clear, encouraging — never clinical or corporate  
+**Purpose:** Personal finance, expense tracking, and savings tool.  
+**Audience:** Universal. Tool for everyone.  
+**Tone:** Warm, clear, encouraging, universally appealing. Never clinical or corporate.  
 
 ---
 
 ## 2. Visual Style & Vibe
 
-*   **Minimalism:** The design must be simple and minimalistic, avoiding clutter and focusing on essential information.
-*   **Color Palette:** The color palette should be calm and peaceful (*spokojna kolorystyka*). This creates a stress-free, approachable environment for managing finances.
-*   **Contrast & UX:** While the overall tone is muted and calm, specific interactive or important elements (e.g., net income amounts, expenses, call-to-action buttons, warnings) must stand out clearly with distinct accents to ensure good user experience (UX) and high readability.
+*   **Minimalism:** Simple, minimalistic design. Focus on essentials.
+*   **Color Palette:** Calm, peaceful (*spokojna kolorystyka*). Create stress-free environment for managing finances.
+*   **Contrast & UX:** Specific interactive or important elements (net income, expenses, buttons, warnings) must stand out clearly for good UX.
 
 ---
 
 ## 3. Logo
 
-The application uses a specific logo saved as `logo2.png`.
+App uses specific logo: `logo2.png`.
 
 *   **Reference:** ![Florin Logo](logo2.png)
-*   **Visual Identity Anchor:** The app's entire visual identity—including its colors, typography, and overall vibe—should be anchored around and heavily inspired by the style of this specific logo.
+*   **Visual Identity Anchor:** App visual identity and colors anchored around style and vibe of this specific logo.
 
 ---
 
 ## 4. Color System
 
-All colors are defined as hex values for use in customtkinter themes and CTk widget configuration.
+All colors defined as hex values for customtkinter themes.
 
 ### Primary Palette
 
