@@ -16,6 +16,13 @@ _STRINGS = {
         "help.title": "Help",
         "help.search_placeholder": "Search help...",
         "help.no_results": "No matching sections found.",
+        
+        "nav.shared_goals": "Shared Goals",
+        "shared.planned": "Planned",
+        "shared.actual": "Actual",
+        "shared.status": "Status",
+        "shared.totals": "Totals",
+        "settings.enable_shared_goals": "Enable Shared Goals",
     },
 }
 

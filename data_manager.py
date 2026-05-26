@@ -741,3 +741,95 @@ def load_xlsx(filepath: str, password: str = None, sheet_name: str = "kwiecień 
         return {"status": "success", "message": "Imported basic layout"}
     except Exception as e:
         return {"error": "import_failed", "message": str(e)}
+
+# --- Shared Goals ---
+def get_shared_goals():
+    init_env()
+    conn = get_connection()
+    inject_shared_goals_example_data()  # Ensure examples exist if empty
+
+    goals = []
+    goal_rows = conn.execute("SELECT id, name FROM shared_goals ORDER BY created_at ASC").fetchall()
+    
+    for grow in goal_rows:
+        goal_id = grow["id"]
+        goal = {
+            "id": goal_id,
+            "name": grow["name"],
+            "persons": [],
+            "data": {}
+        }
+        
+        person_rows = conn.execute("SELECT id, name FROM shared_goals_persons WHERE goal_id = ? ORDER BY id", (goal_id,)).fetchall()
+        for prow in person_rows:
+            goal["persons"].append({"id": prow["id"], "name": prow["name"]})
+            
+        data_rows = conn.execute("SELECT month_key, person_id, planned, actual FROM shared_goals_data WHERE goal_id = ?", (goal_id,)).fetchall()
+        for drow in data_rows:
+            mk = drow["month_key"]
+            pid = drow["person_id"]
+            if mk not in goal["data"]:
+                goal["data"][mk] = {}
+            goal["data"][mk][pid] = {
+                "planned": drow["planned"],
+                "actual": drow["actual"]
+            }
+            
+        goals.append(goal)
+        
+    return goals
+
+def save_shared_goals(goals):
+    conn = get_connection()
+    
+    conn.execute("DELETE FROM shared_goals")
+    conn.execute("DELETE FROM shared_goals_persons")
+    conn.execute("DELETE FROM shared_goals_data")
+    
+    for g in goals:
+        conn.execute("INSERT INTO shared_goals (id, name) VALUES (?, ?)", (g["id"], g["name"]))
+        for p in g["persons"]:
+            conn.execute("INSERT INTO shared_goals_persons (id, goal_id, name) VALUES (?, ?, ?)", (p["id"], g["id"], p["name"]))
+        for mk, pdata in g["data"].items():
+            for pid, amounts in pdata.items():
+                conn.execute(
+                    "INSERT INTO shared_goals_data (goal_id, month_key, person_id, planned, actual) VALUES (?, ?, ?, ?, ?)",
+                    (g["id"], mk, pid, amounts["planned"], amounts["actual"])
+                )
+    conn.commit()
+
+def inject_shared_goals_example_data():
+    conn = get_connection()
+    count = conn.execute("SELECT COUNT(*) FROM shared_goals").fetchone()[0]
+    if count == 0:
+        goal1_id = generate_id()
+        p1_id = generate_id()
+        p2_id = generate_id()
+        
+        goal2_id = generate_id()
+        p3_id = generate_id()
+        p4_id = generate_id()
+        
+        goals = [
+            {
+                "id": goal1_id,
+                "name": "House",
+                "persons": [{"id": p1_id, "name": "Oliwia"}, {"id": p2_id, "name": "Michał"}],
+                "data": {
+                    "2024-09": {p1_id: {"planned": 5000, "actual": 5000}, p2_id: {"planned": 5000, "actual": 5000}},
+                    "2024-10": {p1_id: {"planned": 5000, "actual": 4500}, p2_id: {"planned": 5000, "actual": 5000}},
+                    "2024-11": {p1_id: {"planned": 5000, "actual": 0}, p2_id: {"planned": 5000, "actual": 0}}
+                }
+            },
+            {
+                "id": goal2_id,
+                "name": "Wedding",
+                "persons": [{"id": p3_id, "name": "Oliwia"}, {"id": p4_id, "name": "Michał"}],
+                "data": {
+                    "2024-09": {p3_id: {"planned": 2000, "actual": 2000}, p4_id: {"planned": 2000, "actual": 2000}},
+                    "2024-10": {p3_id: {"planned": 2000, "actual": 2500}, p4_id: {"planned": 2000, "actual": 2000}},
+                    "2024-11": {p3_id: {"planned": 2000, "actual": 0}, p4_id: {"planned": 2000, "actual": 0}}
+                }
+            }
+        ]
+        save_shared_goals(goals)

@@ -59,26 +59,49 @@ class FlorinApp(ctk.CTk):
         nav_items = [
             ("Dashboard", "🏠"), ("Income", "💰"), 
             ("Expenses", "🧾"), ("Savings", "🎯"),
+            ("Shared Goals", "🤝"),
             ("Cash Flow", "💧"), ("History", "📅"), 
             ("Settings", "⚙️"), ("Help", "❓")
         ]
         
         for name, icon in nav_items:
             btn = ctk.CTkButton(
-                self.sidebar, text=f"{icon}  {name}", 
+                self.sidebar, text=f"{icon}  {t('nav.shared_goals') if name == 'Shared Goals' else name}", 
                 fg_color="transparent", text_color=COLOR_TEXT, 
                 font=FONT_BODY, anchor="w",
                 hover_color=COLOR_SURFACE_2,
                 command=lambda n=name: self.show_view(n)
             )
-            btn.pack(pady=4, padx=12, fill="x")
             self.nav_buttons[name] = btn
+            if name == "Shared Goals" and self.config.get("enable_shared_goals", "false") != "true":
+                continue
+            btn.pack(pady=4, padx=12, fill="x")
+            
+    def refresh_sidebar(self):
+        show_shared = self.config.get("enable_shared_goals", "false") == "true"
+        for name, btn in self.nav_buttons.items():
+            if name == "Shared Goals":
+                if show_shared:
+                    # To keep order, we repack everything
+                    break
+                else:
+                    btn.pack_forget()
+                    if self.views["Shared Goals"].winfo_ismapped():
+                        self.show_view("Dashboard")
+        if show_shared:
+            for btn in self.nav_buttons.values():
+                btn.pack_forget()
+            for name, btn in self.nav_buttons.items():
+                if name == "Shared Goals" and not show_shared:
+                    continue
+                btn.pack(pady=4, padx=12, fill="x")
             
     def setup_views(self):
         self.views["Dashboard"] = DashboardView(self.main_container, self)
         self.views["Income"] = IncomeView(self.main_container, self)
         self.views["Expenses"] = ExpensesView(self.main_container, self)
         self.views["Savings"] = SavingsView(self.main_container, self)
+        self.views["Shared Goals"] = SharedGoalsView(self.main_container, self)
         self.views["Cash Flow"] = CashFlowView(self.main_container, self)
         self.views["History"] = HistoryView(self.main_container, self)
         self.views["Settings"] = SettingsView(self.main_container, self)
@@ -2171,6 +2194,17 @@ class SettingsView(ctk.CTkFrame):
 
         ctk.CTkLabel(self.scroll, text="Settings", font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(anchor="w", pady=(0, 20))
 
+        # === Features ===
+        feat_card = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
+        feat_card.pack(fill="x", pady=(0, 15))
+        feat_hdr = ctk.CTkFrame(feat_card, fg_color="transparent")
+        feat_hdr.pack(fill="x", padx=20, pady=(20, 10))
+        ctk.CTkLabel(feat_hdr, text="Features", font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
+        
+        self.shared_goals_var = ctk.StringVar(value=self.controller.config.get("enable_shared_goals", "false"))
+        sw = ctk.CTkSwitch(feat_card, text=t("settings.enable_shared_goals"), variable=self.shared_goals_var, onvalue="true", offvalue="false", command=self.toggle_shared_goals, font=FONT_BODY)
+        sw.pack(anchor="w", padx=20, pady=(0, 20))
+
         # === Default Income Items ===
         inc_card = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
         inc_card.pack(fill="x", pady=(0, 15))
@@ -2268,6 +2302,12 @@ class SettingsView(ctk.CTkFrame):
             dm.edit_cashflow_target(tid, name=name, target_amount=amt)
             self.controller.config = dm.get_config()
 
+    def toggle_shared_goals(self):
+        val = self.shared_goals_var.get()
+        self.controller.config["enable_shared_goals"] = val
+        dm.save_config(self.controller.config)
+        self.controller.refresh_sidebar()
+
     def refresh(self):
         self.build_income_items()
         for w in self.targets_frame.winfo_children():
@@ -2283,6 +2323,154 @@ class SettingsView(ctk.CTkFrame):
             ctk.CTkLabel(row, text="PLN", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="left")
             ctk.CTkButton(row, text="💾", width=28, height=28, fg_color="transparent", text_color=COLOR_SUCCESS, hover_color=COLOR_BORDER, command=lambda tid=t["id"], n=name_var, a=amt_var: self.save_edit(tid, n, a)).pack(side="right", padx=2, pady=5)
             ctk.CTkButton(row, text="🗑", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda tid=t["id"]: self.delete_target(tid)).pack(side="right", padx=5, pady=5)
+
+class SharedGoalsView(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, fg_color="transparent")
+        self.controller = controller
+        self.editing = False
+        
+        # Header
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(hdr, text=t("nav.shared_goals"), font=FONT_DISPLAY, text_color=COLOR_TEXT).pack(side="left")
+        self.edit_btn = ctk.CTkButton(hdr, text="✎ Edit", width=80, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self.toggle_edit)
+        self.edit_btn.pack(side="right")
+        
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+        
+        self.goals = []
+        self.cell_vars = {}
+
+    def toggle_edit(self):
+        if self.editing:
+            self.save_all()
+        self.editing = not self.editing
+        if self.editing:
+            self.edit_btn.configure(text="✓ Done", fg_color=COLOR_PRIMARY, text_color="#FFFFFF", hover_color=COLOR_PRIMARY_HOVER)
+        else:
+            self.edit_btn.configure(text="✎ Edit", fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER)
+        self.refresh()
+
+    def save_all(self):
+        for g in self.goals:
+            gid = g["id"]
+            for mk in g["data"]:
+                for p in g["persons"]:
+                    pid = p["id"]
+                    if (gid, mk, pid, "actual") in self.cell_vars:
+                        try:
+                            val = float(self.cell_vars[(gid, mk, pid, "actual")].get().replace(",", "."))
+                            g["data"][mk][pid]["actual"] = val
+                        except:
+                            pass
+                    if (gid, mk, pid, "planned") in self.cell_vars:
+                        try:
+                            val = float(self.cell_vars[(gid, mk, pid, "planned")].get().replace(",", "."))
+                            g["data"][mk][pid]["planned"] = val
+                        except:
+                            pass
+        dm.save_shared_goals(self.goals)
+
+    def refresh(self):
+        for w in self.scroll.winfo_children():
+            w.destroy()
+        self.cell_vars = {}
+        self.goals = dm.get_shared_goals()
+        
+        for goal in self.goals:
+            card = ctk.CTkFrame(self.scroll, fg_color=COLOR_SURFACE, corner_radius=16, border_width=1, border_color=COLOR_BORDER)
+            card.pack(fill="x", pady=(0, 20))
+            
+            hdr = ctk.CTkFrame(card, fg_color="transparent")
+            hdr.pack(fill="x", padx=20, pady=(15, 10))
+            ctk.CTkLabel(hdr, text=goal["name"], font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
+            
+            # Table container
+            grid = ctk.CTkFrame(card, fg_color="transparent")
+            grid.pack(fill="x", padx=20, pady=(0, 20))
+            
+            persons = goal["persons"]
+            if not persons:
+                continue
+                
+            # Headers
+            ctk.CTkLabel(grid, text="Month", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=80, anchor="w").grid(row=0, column=0, padx=5, pady=5)
+            col_idx = 1
+            for p in persons:
+                ctk.CTkLabel(grid, text=p["name"], font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=160).grid(row=0, column=col_idx, columnspan=2, padx=5, pady=5)
+                ctk.CTkLabel(grid, text=t("shared.planned"), font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=1, column=col_idx, padx=2, pady=2)
+                ctk.CTkLabel(grid, text=t("shared.actual"), font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=1, column=col_idx+1, padx=2, pady=2)
+                col_idx += 2
+            ctk.CTkLabel(grid, text=t("shared.status"), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=0, column=col_idx, rowspan=2, padx=5, pady=5)
+            
+            months = sorted(goal["data"].keys())
+            row_idx = 2
+            
+            tot_planned = {p["id"]: 0.0 for p in persons}
+            tot_actual = {p["id"]: 0.0 for p in persons}
+            
+            for mk in months:
+                # Format mk from YYYY-MM to e.g. wrz.24
+                try:
+                    d = datetime.strptime(mk, "%Y-%m")
+                    months_pl = ["sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru"]
+                    mk_display = f"{months_pl[d.month-1]}.{str(d.year)[-2:]}"
+                except:
+                    mk_display = mk
+                    
+                ctk.CTkLabel(grid, text=mk_display, font=FONT_BODY, text_color=COLOR_TEXT, width=80, anchor="w").grid(row=row_idx, column=0, padx=5, pady=5)
+                
+                col_idx = 1
+                month_planned_sum = 0
+                month_actual_sum = 0
+                
+                for p in persons:
+                    pid = p["id"]
+                    pdata = goal["data"][mk].get(pid, {"planned": 0.0, "actual": 0.0})
+                    
+                    tot_planned[pid] += pdata["planned"]
+                    tot_actual[pid] += pdata["actual"]
+                    month_planned_sum += pdata["planned"]
+                    month_actual_sum += pdata["actual"]
+                    
+                    if self.editing:
+                        v_plan = ctk.StringVar(value=f"{pdata['planned']:.0f}")
+                        v_act = ctk.StringVar(value=f"{pdata['actual']:.0f}")
+                        self.cell_vars[(goal["id"], mk, pid, "planned")] = v_plan
+                        self.cell_vars[(goal["id"], mk, pid, "actual")] = v_act
+                        
+                        ctk.CTkEntry(grid, textvariable=v_plan, font=FONT_MONO, width=70, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER).grid(row=row_idx, column=col_idx, padx=2, pady=5)
+                        ctk.CTkEntry(grid, textvariable=v_act, font=FONT_MONO, width=70, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER).grid(row=row_idx, column=col_idx+1, padx=2, pady=5)
+                    else:
+                        ctk.CTkLabel(grid, text=f"{pdata['planned']:,.0f}", font=FONT_MONO, text_color=COLOR_TEXT_MUTED, width=80).grid(row=row_idx, column=col_idx, padx=2, pady=5)
+                        act_color = COLOR_SUCCESS if pdata["actual"] >= pdata["planned"] else COLOR_WARNING if pdata["actual"] > 0 else COLOR_TEXT
+                        ctk.CTkLabel(grid, text=f"{pdata['actual']:,.0f}", font=FONT_MONO, text_color=act_color, width=80).grid(row=row_idx, column=col_idx+1, padx=2, pady=5)
+                    col_idx += 2
+                
+                # Status indicator
+                status_color = COLOR_SUCCESS if month_actual_sum >= month_planned_sum and month_planned_sum > 0 else COLOR_ERROR if month_actual_sum > 0 else COLOR_BORDER
+                indicator = ctk.CTkFrame(grid, width=16, height=16, corner_radius=8, fg_color=status_color)
+                indicator.grid(row=row_idx, column=col_idx, padx=5, pady=5)
+                
+                row_idx += 1
+                
+            # Totals Row
+            # Draw separator
+            sep = ctk.CTkFrame(grid, height=1, fg_color=COLOR_BORDER)
+            sep.grid(row=row_idx, column=0, columnspan=col_idx+1, sticky="ew", pady=(10, 5))
+            row_idx += 1
+            
+            ctk.CTkLabel(grid, text=t("shared.totals"), font=FONT_TITLE, text_color=COLOR_TEXT, width=80, anchor="w").grid(row=row_idx, column=0, padx=5, pady=5)
+            col_idx = 1
+            for p in persons:
+                pid = p["id"]
+                ctk.CTkLabel(grid, text=f"{tot_planned[pid]:,.0f}", font=FONT_MONO, text_color=COLOR_TEXT_MUTED, width=80).grid(row=row_idx, column=col_idx, padx=2, pady=5)
+                act_color = COLOR_SUCCESS if tot_actual[pid] >= tot_planned[pid] and tot_planned[pid] > 0 else COLOR_TEXT
+                ctk.CTkLabel(grid, text=f"{tot_actual[pid]:,.0f}", font=FONT_MONO, text_color=act_color, width=80).grid(row=row_idx, column=col_idx+1, padx=2, pady=5)
+                col_idx += 2
+
 
 class HelpView(ctk.CTkFrame):
     def __init__(self, parent, controller):

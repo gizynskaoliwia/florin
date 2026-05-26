@@ -181,6 +181,30 @@ CREATE TABLE IF NOT EXISTS savings_spent (
     amount REAL NOT NULL DEFAULT 0.0
 );
 
+-- Shared goals definitions
+CREATE TABLE IF NOT EXISTS shared_goals (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Shared goals persons
+CREATE TABLE IF NOT EXISTS shared_goals_persons (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT NOT NULL,
+    name TEXT NOT NULL
+);
+
+-- Shared goals monthly data
+CREATE TABLE IF NOT EXISTS shared_goals_data (
+    goal_id TEXT NOT NULL,
+    month_key TEXT NOT NULL,
+    person_id TEXT NOT NULL,
+    planned REAL NOT NULL DEFAULT 0.0,
+    actual REAL NOT NULL DEFAULT 0.0,
+    PRIMARY KEY (goal_id, month_key, person_id)
+);
+
 -- Migration tracking
 CREATE TABLE IF NOT EXISTS migrations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
