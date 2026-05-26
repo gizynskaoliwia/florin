@@ -8,7 +8,7 @@
 
 ## 1. Project Overview
 
-**Florin** is a desktop budget tracker for freelancers with variable income. Built for a single user, all data stored locally as JSON files.
+**Florin** is a desktop budget tracker for freelancers with variable income. Built for a single user, all data is stored locally in an SQLite database.
 
 ### Tech Stack
 
@@ -16,7 +16,7 @@
 |-----------|-----------|
 | Language | Python 3.10+ |
 | UI Framework | customtkinter (CTk) + tkinter |
-| Data Storage | Local JSON files |
+| Data Storage | Local SQLite database |
 | Excel Import | openpyxl + msoffcrypto-tool |
 | Images | Pillow |
 | Calendar | tkcalendar |
@@ -47,9 +47,7 @@ florin/
 ├── README.md                # User-facing documentation
 ├── logo2.png / logo2.ico    # App icon
 ├── create_shortcut.ps1      # Windows shortcut creator
-├── data/                    # Auto-created, gitignored
-│   ├── YYYY-MM.json         # Monthly income/expenses/cashflow
-│   └── savings_planner.json # Savings categories, grids, actuals
+├── run_on_mac.command       # macOS startup script
 └── docs/
     ├── ARCHITECTURE.md      # (legacy, superseded by root ARCHITECTURE.md)
     └── DATA_MODEL.md        # (legacy)
@@ -438,8 +436,7 @@ Sorting is applied to display copies only — underlying data structures retain 
 
 ### Known Limitations
 
-- **Single file = single user.** No concurrent access handling.
-- **Full JSON rewrite on every save.** No incremental updates. Fine for current data sizes (<30KB) but won't scale to thousands of expenses.
+- **Single database file = single user.** No concurrent access handling.
 - **`SavingsActualView` is dead code.** Class defined but never instantiated. Should be removed.
 - **No undo/redo.** Edits are immediately persisted.
 - **Horizontal scroll on Savings tab** requires content wider than viewport. Uses `width=0` trick on canvas window which may behave differently across OS/tk versions.

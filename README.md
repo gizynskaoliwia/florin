@@ -1,8 +1,8 @@
 <div align="center">
   <img src="logo2.png" alt="Florin Logo" width="100"/>
   <h1>Florin</h1>
-  <p><strong>A personal budget tracker for freelancers & self-employed professionals</strong></p>
-  <p>Built with Python · customtkinter · JSON persistence</p>
+  <p><strong>A personal finance, expense tracking, and savings tool</strong></p>
+  <p>Built with Python · customtkinter · SQLite</p>
 </div>
 
 ---
@@ -17,7 +17,7 @@ Florin is a desktop budget tracking app designed specifically for people with va
 - Monitor your **cash flow buffer** and calculate top-up amounts
 - Keep a monthly **history** with account balances
 
-All data is stored locally in JSON files — no cloud, no subscriptions.
+All data is stored locally in an SQLite database — no cloud, no subscriptions. The app is fully bilingual (English and Polish).
 
 ---
 
@@ -76,15 +76,15 @@ florin/
 
 ## Data Storage
 
-All data is saved in `./data/` as JSON files:
+All data is saved securely in a local SQLite database file on your computer.
 
-| File | Contents |
-|---|---|
-| `data/YYYY-MM.json` | Monthly income, expenses, categories, cashflow |
-| `data/history.json` | Monthly snapshots and account balances |
-| `config.json` | App config: last month, window size (gitignored) |
+| Operating System | Database Location |
+|-----------------|-------------------|
+| Windows | `C:\Users\<YourName>\AppData\Local\Florin\florin.db` |
+| macOS | `~/Library/Application Support/Florin/florin.db` |
 
-No data ever leaves your machine.
+The database file is completely ignored by Git to ensure your personal financial records stay strictly on your machine.
+No data ever leaves your computer.
 
 ---
 

@@ -1,6 +1,6 @@
 # Florin Help
 
-Welcome to Florin — your personal budget tracker designed for freelancers and self-employed professionals with variable monthly income.
+Welcome to Florin — your personal finance, expense tracking, and savings tool designed for everyone.
 
 ---
 
@@ -213,25 +213,24 @@ Changes in Settings apply to future months. They don't retroactively change past
 
 ## Frequently Asked Questions
 
-### Where is my data stored?
-
-All your data is stored in a folder called `data/` next to the app, and a file called `config.json`. Everything stays on your computer. Nothing is ever sent to the internet.
-
 ### Can I lose my data?
 
 Your data is as safe as any file on your computer. It could be lost if:
-- You delete the `data/` folder
+- You delete the database file
 - Your hard drive fails
 - You reinstall your system without backing up
 
-**Tip:** Periodically copy the `data/` folder somewhere safe (USB drive, cloud backup folder) for peace of mind.
+**Tip:** Periodically copy your `florin.db` database file somewhere safe (USB drive, cloud backup folder) for peace of mind. See the **Where Is My Data Stored?** section below for the file location.
 
 ### What should I do if something doesn't work?
 
-1. Close and reopen the app — this fixes most display issues
-2. Check that your `data/` folder exists and contains `.json` files
-3. If a specific month seems broken, check the corresponding `data/YYYY-MM.json` file isn't empty or corrupted
-4. As a last resort, you can delete `config.json` to reset settings (your monthly data and savings will be preserved)
+1. Close and reopen the app — this fixes most display issues.
+2. Check that your database file exists.
+3. As a last resort, you can delete `config.json` to reset settings (your monthly data and savings will be preserved).
+
+### Can I use the app in Polish?
+
+Yes! Florin's interface is fully bilingual (English and Polish).
 
 ### Can I use commas for decimal numbers?
 
