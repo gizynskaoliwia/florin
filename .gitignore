@@ -1,6 +1,9 @@
 # Files with personal/financial data
 budżet.xlsx
 odkładanko.xlsx
+*.db
+*.sqlite
+*.sqlite3
 
 # Generated icon files (derived from logo2.png)
 logo.ico
@@ -14,6 +17,7 @@ __pycache__/
 
 # Data files (personal monthly data)
 data/
+*.json
 
 # Config (contains last-used month, window state — personal)
 config.json
