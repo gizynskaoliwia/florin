@@ -127,6 +127,9 @@ Log one-off income (e.g. a freelance bonus) and assign it to:
 ### 💧 Cash Flow Buffer
 Define minimum balances for key accounts and calculate exactly how much to top up after receiving your paycheck. Shows what's left for savings.
 
+### 🎯 Shared Goals
+Collaborate on long-term goals (like a House or Wedding) with another person. Track planned vs actual savings per person, month by month, and see combined progress. Can be toggled on/off in Settings.
+
 ### 📅 History _(coming in a future phase)_
 Monthly archive with auto-calculated remainders and manual account balance entries.
 
@@ -148,8 +151,9 @@ Monthly archive with auto-calculated remainders and manual account balance entri
 - [x] Extra income dialog
 - [x] Expense tracker
 - [x] Cash flow buffer
-- [ ] History tab with snapshots
-- [ ] Settings tab (category names, buffer minimums)
+- [x] History tab with snapshots
+- [x] Settings tab (category names, buffer minimums)
+- [x] Shared Goals tracking
 - [ ] xlsx import from encrypted budget file
 - [ ] Spending charts and trends
 - [ ] PDF monthly report export
