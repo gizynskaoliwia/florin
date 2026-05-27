@@ -1,0 +1,1244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Florin — color explorations</title>
+<link rel="icon" href="assets/logo.png" />
+<style>
+  /* ===========================================================================
+     Florin — color explorations
+     Five differentiated palette directions, each anchored on the same
+     six brand tokens used in florin.css (bg, surface, fg, muted, border,
+     accent) plus the same semantic income/expense + category structure.
+     Switching the body data-scheme attribute swaps the entire palette
+     with no layout shift, so directions are genuinely comparable.
+  ============================================================================*/
+
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  /* ---------- 1. Petal Rose (current brand, default) ---------- */
+  :root,
+  [data-scheme="petal-rose"] {
+    --bg:        oklch(97.5% 0.012 350);
+    --surface:   oklch(100% 0 0);
+    --surface-2: oklch(96.5% 0.018 350);
+    --border:    oklch(85% 0.05 350);
+    --fg:        oklch(22% 0.04 340);
+    --muted:     oklch(48% 0.04 340);
+    --faint:     oklch(75% 0.03 340);
+    --accent:        oklch(63% 0.13 348);
+    --accent-hover:  oklch(52% 0.14 348);
+    --accent-soft:   oklch(63% 0.13 348 / 0.10);
+    --income:    oklch(60% 0.07 175);
+    --expense:   oklch(60% 0.13 6);
+    --warning:   oklch(70% 0.12 60);
+    --cat-1: oklch(75% 0.10 80);
+    --cat-2: oklch(64% 0.10 250);
+    --cat-3: oklch(67% 0.09 155);
+    --cat-4: oklch(63% 0.13 348);
+    --hero-overlay: oklch(60% 0.07 175 / 0.04);
+  }
+
+  /* ---------- 2. Forest Linen (sage-forward, leaf side of the lily) ---------- */
+  [data-scheme="forest-linen"] {
+    --bg:        oklch(96.5% 0.012 100);
+    --surface:   oklch(100% 0 0);
+    --surface-2: oklch(94.5% 0.015 110);
+    --border:    oklch(86% 0.025 130);
+    --fg:        oklch(24% 0.04 145);
+    --muted:     oklch(46% 0.03 130);
+    --faint:     oklch(72% 0.025 130);
+    --accent:        oklch(48% 0.10 155);
+    --accent-hover:  oklch(40% 0.11 155);
+    --accent-soft:   oklch(48% 0.10 155 / 0.10);
+    --income:    oklch(50% 0.10 165);
+    --expense:   oklch(58% 0.13 35);
+    --warning:   oklch(70% 0.13 70);
+    --cat-1: oklch(70% 0.11 75);
+    --cat-2: oklch(58% 0.09 220);
+    --cat-3: oklch(55% 0.10 155);
+    --cat-4: oklch(58% 0.13 35);
+    --hero-overlay: oklch(50% 0.10 165 / 0.05);
+  }
+
+  /* ---------- 3. Plum Night (dark mode — the brand's stated dark spec) ---------- */
+  [data-scheme="plum-night"] {
+    --bg:        oklch(20% 0.02 340);
+    --surface:   oklch(26% 0.025 340);
+    --surface-2: oklch(29% 0.03 340);
+    --border:    oklch(38% 0.04 340);
+    --fg:        oklch(94% 0.02 340);
+    --muted:     oklch(75% 0.03 340);
+    --faint:     oklch(54% 0.03 340);
+    --accent:        oklch(74% 0.11 340);
+    --accent-hover:  oklch(66% 0.13 340);
+    --accent-soft:   oklch(74% 0.11 340 / 0.16);
+    --income:    oklch(72% 0.10 170);
+    --expense:   oklch(72% 0.14 15);
+    --warning:   oklch(78% 0.12 70);
+    --cat-1: oklch(78% 0.12 80);
+    --cat-2: oklch(72% 0.11 245);
+    --cat-3: oklch(75% 0.10 160);
+    --cat-4: oklch(74% 0.11 340);
+    --hero-overlay: oklch(74% 0.11 340 / 0.10);
+  }
+
+  /* ---------- 4. Nordic Mist (cool, minimal, almost monochrome) ---------- */
+  [data-scheme="nordic-mist"] {
+    --bg:        oklch(98% 0.005 240);
+    --surface:   oklch(100% 0 0);
+    --surface-2: oklch(96% 0.008 240);
+    --border:    oklch(89% 0.012 240);
+    --fg:        oklch(22% 0.025 250);
+    --muted:     oklch(50% 0.020 245);
+    --faint:     oklch(74% 0.015 245);
+    --accent:        oklch(54% 0.11 220);
+    --accent-hover:  oklch(46% 0.13 220);
+    --accent-soft:   oklch(54% 0.11 220 / 0.10);
+    --income:    oklch(58% 0.12 160);
+    --expense:   oklch(60% 0.13 25);
+    --warning:   oklch(72% 0.13 75);
+    --cat-1: oklch(70% 0.12 85);
+    --cat-2: oklch(60% 0.12 230);
+    --cat-3: oklch(60% 0.11 160);
+    --cat-4: oklch(60% 0.13 350);
+    --hero-overlay: oklch(54% 0.11 220 / 0.04);
+  }
+
+  /* ---------- 5. Honey Cream (warm, no pink, amber-led) ---------- */
+  [data-scheme="honey-cream"] {
+    --bg:        oklch(96.5% 0.020 80);
+    --surface:   oklch(100% 0 0);
+    --surface-2: oklch(94% 0.022 80);
+    --border:    oklch(86% 0.030 75);
+    --fg:        oklch(24% 0.025 60);
+    --muted:     oklch(48% 0.030 65);
+    --faint:     oklch(74% 0.025 70);
+    --accent:        oklch(56% 0.13 50);
+    --accent-hover:  oklch(46% 0.15 45);
+    --accent-soft:   oklch(56% 0.13 50 / 0.10);
+    --income:    oklch(54% 0.10 130);
+    --expense:   oklch(56% 0.14 40);
+    --warning:   oklch(72% 0.14 80);
+    --cat-1: oklch(72% 0.13 75);
+    --cat-2: oklch(60% 0.10 230);
+    --cat-3: oklch(58% 0.11 140);
+    --cat-4: oklch(58% 0.13 35);
+    --hero-overlay: oklch(56% 0.13 50 / 0.05);
+  }
+
+  /* ===== Page layout (independent of any scheme) ===== */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    color: var(--fg);
+    background: var(--bg);
+    transition: background 220ms ease, color 220ms ease;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+
+  .page__head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+  .page__head h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: clamp(34px, 4vw, 48px);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--fg);
+  }
+  .page__head h1 em { color: var(--accent); font-style: normal; font-weight: 600; }
+  .page__head p {
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 520px;
+    margin: 12px 0 0;
+  }
+  .page__head .meta {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 12px;
+  }
+  .page__head .meta .dot { color: var(--accent); }
+
+  /* ===== Scheme tab bar ===== */
+  .schemes {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 32px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    transition: background 220ms ease, border-color 220ms ease;
+  }
+  .scheme-tab {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--fg);
+    text-align: left;
+    transition: background 160ms ease, border-color 160ms ease;
+  }
+  .scheme-tab:hover { background: var(--surface); }
+  .scheme-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .scheme-tab[aria-selected="true"] {
+    background: var(--surface);
+    border-color: var(--border);
+  }
+  .scheme-tab__dots {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .scheme-tab__dot-row { display: flex; gap: 3px; }
+  .scheme-tab__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .scheme-tab__name {
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+  .scheme-tab__sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* Each tab carries its own swatch dots so the comparison is visible
+     without switching schemes. */
+  .scheme-tab[data-target="petal-rose"]  .scheme-tab__dot:nth-child(1) { background: oklch(97.5% 0.012 350); }
+  .scheme-tab[data-target="petal-rose"]  .scheme-tab__dot:nth-child(2) { background: oklch(63% 0.13 348); }
+  .scheme-tab[data-target="petal-rose"]  .scheme-tab__dot:nth-child(3) { background: oklch(60% 0.07 175); }
+  .scheme-tab[data-target="petal-rose"]  .scheme-tab__dot:nth-child(4) { background: oklch(22% 0.04 340); }
+
+  .scheme-tab[data-target="forest-linen"] .scheme-tab__dot:nth-child(1) { background: oklch(96.5% 0.012 100); }
+  .scheme-tab[data-target="forest-linen"] .scheme-tab__dot:nth-child(2) { background: oklch(48% 0.10 155); }
+  .scheme-tab[data-target="forest-linen"] .scheme-tab__dot:nth-child(3) { background: oklch(58% 0.13 35); }
+  .scheme-tab[data-target="forest-linen"] .scheme-tab__dot:nth-child(4) { background: oklch(24% 0.04 145); }
+
+  .scheme-tab[data-target="plum-night"]   .scheme-tab__dot:nth-child(1) { background: oklch(20% 0.02 340); }
+  .scheme-tab[data-target="plum-night"]   .scheme-tab__dot:nth-child(2) { background: oklch(74% 0.11 340); }
+  .scheme-tab[data-target="plum-night"]   .scheme-tab__dot:nth-child(3) { background: oklch(72% 0.10 170); }
+  .scheme-tab[data-target="plum-night"]   .scheme-tab__dot:nth-child(4) { background: oklch(94% 0.02 340); }
+
+  .scheme-tab[data-target="nordic-mist"]  .scheme-tab__dot:nth-child(1) { background: oklch(98% 0.005 240); }
+  .scheme-tab[data-target="nordic-mist"]  .scheme-tab__dot:nth-child(2) { background: oklch(54% 0.11 220); }
+  .scheme-tab[data-target="nordic-mist"]  .scheme-tab__dot:nth-child(3) { background: oklch(58% 0.12 160); }
+  .scheme-tab[data-target="nordic-mist"]  .scheme-tab__dot:nth-child(4) { background: oklch(22% 0.025 250); }
+
+  .scheme-tab[data-target="honey-cream"]  .scheme-tab__dot:nth-child(1) { background: oklch(96.5% 0.020 80); }
+  .scheme-tab[data-target="honey-cream"]  .scheme-tab__dot:nth-child(2) { background: oklch(56% 0.13 50); }
+  .scheme-tab[data-target="honey-cream"]  .scheme-tab__dot:nth-child(3) { background: oklch(54% 0.10 130); }
+  .scheme-tab[data-target="honey-cream"]  .scheme-tab__dot:nth-child(4) { background: oklch(24% 0.025 60); }
+
+  /* ===== Live dashboard preview ===== */
+  .preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+    transition: background 220ms ease, border-color 220ms ease;
+    position: relative;
+  }
+
+  .preview__chrome {
+    height: 36px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    transition: background 220ms ease, border-color 220ms ease;
+  }
+  .preview__chrome span { width: 10px; height: 10px; border-radius: 50%; }
+  .preview__chrome span:nth-child(1) { background: oklch(70% 0.18 30); }
+  .preview__chrome span:nth-child(2) { background: oklch(80% 0.15 80); }
+  .preview__chrome span:nth-child(3) { background: oklch(72% 0.16 145); }
+  .preview__chrome .title {
+    margin-left: auto; margin-right: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .preview__body {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    min-height: 720px;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--surface-2);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+    transition: background 220ms ease, border-color 220ms ease;
+  }
+  .sidebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    padding: 0 8px;
+  }
+  .sidebar__brand .logo {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--cat-3), var(--accent));
+    box-shadow: inset 0 0 0 2px var(--surface);
+  }
+  .sidebar__brand .name {
+    font-family: 'Playfair Display', serif;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .sidebar__section {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--faint);
+    padding: 0 8px;
+    margin: 16px 0 8px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: default;
+    transition: background 140ms ease, color 140ms ease;
+  }
+  .nav-item.is-active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .nav-item .ico {
+    width: 14px; height: 14px;
+    border-radius: 4px;
+    background: currentColor;
+    opacity: 0.5;
+    flex-shrink: 0;
+  }
+  .nav-item.is-active .ico { opacity: 1; }
+
+  /* Main */
+  .main {
+    padding: 28px 32px;
+    background: var(--bg);
+    transition: background 220ms ease;
+    min-width: 0;
+  }
+  .main__head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+  }
+  .main__head h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+  }
+  .main__head .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 6px;
+  }
+  .main__head .eyebrow .dot { color: var(--accent); }
+  .month-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    transition: background 220ms ease, border-color 220ms ease;
+  }
+  .month-switch button {
+    width: 28px; height: 28px;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .month-switch .month {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+    padding: 0 4px;
+    letter-spacing: 0.06em;
+  }
+
+  /* Hero — net income card */
+  .hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+    transition: background 220ms ease, border-color 220ms ease;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--hero-overlay);
+    pointer-events: none;
+  }
+  .hero__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 32px;
+    position: relative;
+  }
+  .hero__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .hero__net {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 44px;
+    font-weight: 700;
+    color: var(--income);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .hero__net .ccy {
+    font-size: 18px;
+    color: var(--muted);
+    margin-left: 8px;
+    font-weight: 500;
+  }
+  .hero__sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .hero__breakdown {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    min-width: 360px;
+  }
+  .hero__cell .l {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .hero__cell .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .hero__cell .v.expense { color: var(--expense); }
+
+  /* Two-column body grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 18px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px;
+    transition: background 220ms ease, border-color 220ms ease;
+  }
+  .card__title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--muted);
+    margin: 0 0 16px;
+  }
+
+  /* Donut chart (CSS conic-gradient) */
+  .donut-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 24px;
+    align-items: center;
+  }
+  .donut {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--cat-1) 0% 40%,
+      var(--cat-2) 40% 60%,
+      var(--cat-3) 60% 80%,
+      var(--cat-4) 80% 100%
+    );
+    position: relative;
+  }
+  .donut::after {
+    content: '';
+    position: absolute;
+    inset: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+  .donut__center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+  .donut__center .l {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .donut__center .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--fg);
+    margin-top: 2px;
+  }
+  .alloc { display: flex; flex-direction: column; gap: 12px; }
+  .alloc__row {
+    display: grid;
+    grid-template-columns: 110px 1fr 80px;
+    align-items: center;
+    gap: 12px;
+  }
+  .alloc__name { font-size: 13px; font-weight: 600; color: var(--fg); display: flex; align-items: center; gap: 8px; }
+  .alloc__name .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .alloc__bar { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .alloc__bar-fill { height: 100%; border-radius: 999px; }
+  .alloc__value {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    text-align: right;
+  }
+
+  /* Buffer card */
+  .buffer { display: flex; flex-direction: column; gap: 14px; }
+  .buffer__big {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--fg);
+    line-height: 1;
+  }
+  .buffer__big .ccy { font-size: 14px; color: var(--muted); margin-left: 6px; font-weight: 500; }
+  .buffer__sub { color: var(--muted); font-size: 12px; }
+  .buffer__progress {
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .buffer__progress-fill { height: 100%; background: var(--income); border-radius: 999px; width: 78%; }
+  .buffer__row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .buffer__cta {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: white;
+    border: 0;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 140ms ease;
+  }
+  .buffer__cta:hover { background: var(--accent-hover); }
+
+  /* Expenses list */
+  .expense-list { display: flex; flex-direction: column; }
+  .expense-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .expense-row:last-child { border-bottom: 0; }
+  .expense-row .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid;
+  }
+  .expense-row .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill--c1 { background: color-mix(in oklab, var(--cat-1) 14%, transparent); border-color: color-mix(in oklab, var(--cat-1) 40%, transparent); color: var(--cat-1); }
+  .pill--c2 { background: color-mix(in oklab, var(--cat-2) 14%, transparent); border-color: color-mix(in oklab, var(--cat-2) 40%, transparent); color: var(--cat-2); }
+  .pill--c3 { background: color-mix(in oklab, var(--cat-3) 14%, transparent); border-color: color-mix(in oklab, var(--cat-3) 40%, transparent); color: var(--cat-3); }
+  .pill--c4 { background: color-mix(in oklab, var(--cat-4) 14%, transparent); border-color: color-mix(in oklab, var(--cat-4) 40%, transparent); color: var(--cat-4); }
+  /* Some schemes have a very light cat-1; brighten the text so contrast holds */
+  [data-scheme="plum-night"] .pill--c1,
+  [data-scheme="plum-night"] .pill--c2,
+  [data-scheme="plum-night"] .pill--c3,
+  [data-scheme="plum-night"] .pill--c4 { color: var(--fg); }
+  [data-scheme="plum-night"] .pill--c1 { background: color-mix(in oklab, var(--cat-1) 22%, transparent); }
+  [data-scheme="plum-night"] .pill--c2 { background: color-mix(in oklab, var(--cat-2) 22%, transparent); }
+  [data-scheme="plum-night"] .pill--c3 { background: color-mix(in oklab, var(--cat-3) 22%, transparent); }
+  [data-scheme="plum-night"] .pill--c4 { background: color-mix(in oklab, var(--cat-4) 22%, transparent); }
+
+  .expense-row .desc {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .expense-row .desc .name {
+    font-size: 14px; font-weight: 600; color: var(--fg);
+    white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+  }
+  .expense-row .desc .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--faint);
+    letter-spacing: 0.04em;
+  }
+  .expense-row .amount {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--expense);
+  }
+
+  /* ===== Side-by-side palette comparison strip ===== */
+  .compare {
+    margin-top: 56px;
+  }
+  .compare__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .compare__head h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+  }
+  .compare__head p {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0;
+    max-width: 420px;
+    text-align: right;
+  }
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+  .palette {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+  .palette:hover { transform: translateY(-2px); }
+  .palette:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .palette[data-current="true"] { border-color: var(--accent); }
+  .palette__head { display: flex; flex-direction: column; gap: 2px; }
+  .palette__name { font-weight: 700; font-size: 14px; color: var(--fg); }
+  .palette__sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .palette__rows { display: flex; flex-direction: column; gap: 6px; }
+  .palette__row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+  }
+  .palette__row .sw {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+  }
+  .palette__row .role { color: var(--fg); font-weight: 600; }
+  .palette__row .hex {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    font-size: 10px;
+  }
+  .palette__use {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+
+  /* Self-contained scheme swatches inside .palette — these are static
+     so they do not change with the active scheme; they show each
+     scheme's own swatches simultaneously for genuine comparison. */
+  .palette--petal-rose  .sw[data-r="bg"]      { background: oklch(97.5% 0.012 350); }
+  .palette--petal-rose  .sw[data-r="surface"] { background: oklch(100% 0 0); }
+  .palette--petal-rose  .sw[data-r="accent"]  { background: oklch(63% 0.13 348); }
+  .palette--petal-rose  .sw[data-r="income"]  { background: oklch(60% 0.07 175); }
+  .palette--petal-rose  .sw[data-r="fg"]      { background: oklch(22% 0.04 340); }
+
+  .palette--forest-linen .sw[data-r="bg"]      { background: oklch(96.5% 0.012 100); }
+  .palette--forest-linen .sw[data-r="surface"] { background: oklch(100% 0 0); }
+  .palette--forest-linen .sw[data-r="accent"]  { background: oklch(48% 0.10 155); }
+  .palette--forest-linen .sw[data-r="income"]  { background: oklch(50% 0.10 165); }
+  .palette--forest-linen .sw[data-r="fg"]      { background: oklch(24% 0.04 145); }
+
+  .palette--plum-night   .sw[data-r="bg"]      { background: oklch(20% 0.02 340); }
+  .palette--plum-night   .sw[data-r="surface"] { background: oklch(26% 0.025 340); }
+  .palette--plum-night   .sw[data-r="accent"]  { background: oklch(74% 0.11 340); }
+  .palette--plum-night   .sw[data-r="income"]  { background: oklch(72% 0.10 170); }
+  .palette--plum-night   .sw[data-r="fg"]      { background: oklch(94% 0.02 340); }
+
+  .palette--nordic-mist  .sw[data-r="bg"]      { background: oklch(98% 0.005 240); }
+  .palette--nordic-mist  .sw[data-r="surface"] { background: oklch(100% 0 0); }
+  .palette--nordic-mist  .sw[data-r="accent"]  { background: oklch(54% 0.11 220); }
+  .palette--nordic-mist  .sw[data-r="income"]  { background: oklch(58% 0.12 160); }
+  .palette--nordic-mist  .sw[data-r="fg"]      { background: oklch(22% 0.025 250); }
+
+  .palette--honey-cream  .sw[data-r="bg"]      { background: oklch(96.5% 0.020 80); }
+  .palette--honey-cream  .sw[data-r="surface"] { background: oklch(100% 0 0); }
+  .palette--honey-cream  .sw[data-r="accent"]  { background: oklch(56% 0.13 50); }
+  .palette--honey-cream  .sw[data-r="income"]  { background: oklch(54% 0.10 130); }
+  .palette--honey-cream  .sw[data-r="fg"]      { background: oklch(24% 0.025 60); }
+
+  .footer-line {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    .schemes { grid-template-columns: repeat(2, 1fr); }
+    .palette-grid { grid-template-columns: repeat(2, 1fr); }
+    .preview__body { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .grid { grid-template-columns: 1fr; }
+    .hero__row { flex-direction: column; }
+    .hero__breakdown { min-width: 0; width: 100%; }
+  }
+  @media (max-width: 600px) {
+    .page { padding: 24px 16px 64px; }
+    .schemes { grid-template-columns: 1fr; }
+    .palette-grid { grid-template-columns: 1fr; }
+    .hero__breakdown { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body data-scheme="petal-rose">
+
+<main class="page">
+
+  <header class="page__head">
+    <div>
+      <div class="meta"><span class="dot">●</span> 5 directions · same Florin dashboard</div>
+      <h1>Color <em>explorations</em>.</h1>
+      <p>The same dashboard rendered five different ways. Each direction keeps Florin's posture rules — mono numerics, single-accent budget, soft borders, no shadows — and only swaps the palette. Click a scheme above to apply it live; scroll down to compare every swatch set side by side.</p>
+    </div>
+    <div class="month-switch" aria-label="Month switcher (decorative)">
+      <button aria-label="Previous">‹</button>
+      <span class="month">MAY 2026</span>
+      <button aria-label="Next">›</button>
+    </div>
+  </header>
+
+  <!-- Scheme tab bar -->
+  <div class="schemes" role="tablist" aria-label="Color schemes">
+    <button class="scheme-tab" role="tab" aria-selected="true"  data-target="petal-rose"   tabindex="0">
+      <div class="scheme-tab__dots">
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+      </div>
+      <div>
+        <div class="scheme-tab__name">Petal Rose</div>
+        <div class="scheme-tab__sub">current · brand</div>
+      </div>
+    </button>
+
+    <button class="scheme-tab" role="tab" aria-selected="false" data-target="forest-linen" tabindex="-1">
+      <div class="scheme-tab__dots">
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+      </div>
+      <div>
+        <div class="scheme-tab__name">Forest Linen</div>
+        <div class="scheme-tab__sub">leaf-led · cool</div>
+      </div>
+    </button>
+
+    <button class="scheme-tab" role="tab" aria-selected="false" data-target="plum-night"   tabindex="-1">
+      <div class="scheme-tab__dots">
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+      </div>
+      <div>
+        <div class="scheme-tab__name">Plum Night</div>
+        <div class="scheme-tab__sub">dark · low-light</div>
+      </div>
+    </button>
+
+    <button class="scheme-tab" role="tab" aria-selected="false" data-target="nordic-mist"  tabindex="-1">
+      <div class="scheme-tab__dots">
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+      </div>
+      <div>
+        <div class="scheme-tab__name">Nordic Mist</div>
+        <div class="scheme-tab__sub">cool · minimal</div>
+      </div>
+    </button>
+
+    <button class="scheme-tab" role="tab" aria-selected="false" data-target="honey-cream"  tabindex="-1">
+      <div class="scheme-tab__dots">
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+        <div class="scheme-tab__dot-row"><span class="scheme-tab__dot"></span><span class="scheme-tab__dot"></span></div>
+      </div>
+      <div>
+        <div class="scheme-tab__name">Honey Cream</div>
+        <div class="scheme-tab__sub">warm · amber-led</div>
+      </div>
+    </button>
+  </div>
+
+  <!-- Live dashboard preview -->
+  <div class="preview" aria-label="Live dashboard preview — current scheme applied">
+    <div class="preview__chrome">
+      <span></span><span></span><span></span>
+      <span class="title">florin · dashboard</span>
+    </div>
+    <div class="preview__body">
+
+      <aside class="sidebar" aria-hidden="true">
+        <div class="sidebar__brand">
+          <div class="logo"></div>
+          <div class="name">Florin</div>
+        </div>
+        <div class="sidebar__section">Workspace</div>
+        <div class="nav-item is-active"><span class="ico"></span> Dashboard</div>
+        <div class="nav-item"><span class="ico"></span> Income</div>
+        <div class="nav-item"><span class="ico"></span> Expenses</div>
+        <div class="nav-item"><span class="ico"></span> Cash flow</div>
+        <div class="sidebar__section">Plan</div>
+        <div class="nav-item"><span class="ico"></span> Budgets</div>
+        <div class="nav-item"><span class="ico"></span> History</div>
+        <div class="sidebar__section">Setup</div>
+        <div class="nav-item"><span class="ico"></span> Settings</div>
+      </aside>
+
+      <section class="main">
+        <div class="main__head">
+          <div>
+            <div class="eyebrow"><span class="dot">●</span> May 2026 · 18 days in</div>
+            <h2>Good morning, Michał.</h2>
+          </div>
+        </div>
+
+        <!-- Hero net income card -->
+        <div class="hero">
+          <div class="hero__row">
+            <div>
+              <div class="hero__label">Net income this month</div>
+              <div class="hero__net">6 960,98<span class="ccy">PLN</span></div>
+              <div class="hero__sub">From a 13 000 PLN gross invoice — after VAT, income tax, and ZUS.</div>
+            </div>
+            <div class="hero__breakdown">
+              <div class="hero__cell">
+                <div class="l">Gross</div>
+                <div class="v">13 000,00</div>
+              </div>
+              <div class="hero__cell">
+                <div class="l">VAT 23%</div>
+                <div class="v expense">−2 990,00</div>
+              </div>
+              <div class="hero__cell">
+                <div class="l">Income tax</div>
+                <div class="v expense">−1 421,02</div>
+              </div>
+              <div class="hero__cell">
+                <div class="l">ZUS</div>
+                <div class="v expense">−1 628,00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-column body -->
+        <div class="grid">
+
+          <div class="card">
+            <h3 class="card__title">Allocation by category</h3>
+            <div class="donut-row">
+              <div class="donut" aria-hidden="true">
+                <div class="donut__center">
+                  <div class="l">Allocated</div>
+                  <div class="v">100%</div>
+                </div>
+              </div>
+              <div class="alloc">
+                <div class="alloc__row">
+                  <div class="alloc__name"><span class="dot" style="background: var(--cat-1);"></span>Daily life</div>
+                  <div class="alloc__bar"><div class="alloc__bar-fill" style="width: 100%; background: var(--cat-1);"></div></div>
+                  <div class="alloc__value">2 784,40</div>
+                </div>
+                <div class="alloc__row">
+                  <div class="alloc__name"><span class="dot" style="background: var(--cat-2);"></span>Shared</div>
+                  <div class="alloc__bar"><div class="alloc__bar-fill" style="width: 50%; background: var(--cat-2);"></div></div>
+                  <div class="alloc__value">1 392,20</div>
+                </div>
+                <div class="alloc__row">
+                  <div class="alloc__name"><span class="dot" style="background: var(--cat-3);"></span>Saved</div>
+                  <div class="alloc__bar"><div class="alloc__bar-fill" style="width: 50%; background: var(--cat-3);"></div></div>
+                  <div class="alloc__value">1 392,20</div>
+                </div>
+                <div class="alloc__row">
+                  <div class="alloc__name"><span class="dot" style="background: var(--cat-4);"></span>Pleasure</div>
+                  <div class="alloc__bar"><div class="alloc__bar-fill" style="width: 50%; background: var(--cat-4);"></div></div>
+                  <div class="alloc__value">1 392,18</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card buffer">
+            <h3 class="card__title">Cash-flow buffer</h3>
+            <div>
+              <div class="buffer__big">14 200,00<span class="ccy">PLN</span></div>
+              <div class="buffer__sub">78% of your 18 000 PLN target — about 2.4 months of fixed costs.</div>
+              <div class="buffer__progress" aria-hidden="true"><div class="buffer__progress-fill"></div></div>
+            </div>
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 4px 0;">
+            <div class="buffer__row">
+              <div>
+                <div class="hero__label">Suggested top-up</div>
+                <div class="buffer__big" style="font-size: 22px;">+ 800,00<span class="ccy">PLN</span></div>
+              </div>
+              <button class="buffer__cta">Move to buffer</button>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: 1 / -1;">
+            <h3 class="card__title">Recent expenses</h3>
+            <div class="expense-list">
+              <div class="expense-row">
+                <span class="pill pill--c4"><span class="dot"></span>Pleasure</span>
+                <div class="desc">
+                  <div class="name">Nails — Salon Klara</div>
+                  <div class="meta">22 MAY · BLIK · MICHAŁ</div>
+                </div>
+                <div class="amount">−110,00 PLN</div>
+              </div>
+              <div class="expense-row">
+                <span class="pill pill--c1"><span class="dot"></span>Daily</span>
+                <div class="desc">
+                  <div class="name">Lidl — weekly groceries</div>
+                  <div class="meta">21 MAY · CARD · SHARED</div>
+                </div>
+                <div class="amount">−248,67 PLN</div>
+              </div>
+              <div class="expense-row">
+                <span class="pill pill--c2"><span class="dot"></span>Shared</span>
+                <div class="desc">
+                  <div class="name">Tauron — electricity, April</div>
+                  <div class="meta">20 MAY · TRANSFER · APARTMENT</div>
+                </div>
+                <div class="amount">−312,40 PLN</div>
+              </div>
+              <div class="expense-row">
+                <span class="pill pill--c3"><span class="dot"></span>Saved</span>
+                <div class="desc">
+                  <div class="name">IKE — monthly contribution</div>
+                  <div class="meta">18 MAY · STANDING ORDER</div>
+                </div>
+                <div class="amount">−500,00 PLN</div>
+              </div>
+              <div class="expense-row">
+                <span class="pill pill--c1"><span class="dot"></span>Daily</span>
+                <div class="desc">
+                  <div class="name">Orlen — fuel, full tank</div>
+                  <div class="meta">17 MAY · CARD · CAR</div>
+                </div>
+                <div class="amount">−287,12 PLN</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Side-by-side palette comparison -->
+  <section class="compare" aria-label="Palette comparison">
+    <div class="compare__head">
+      <h2>Palettes side by side.</h2>
+      <p>Click any palette to apply it to the dashboard above. The strip below shows every scheme's swatches simultaneously, so you don't have to flip back and forth.</p>
+    </div>
+
+    <div class="palette-grid">
+
+      <button class="palette palette--petal-rose" data-target="petal-rose" data-current="true">
+        <div class="palette__head">
+          <div class="palette__name">Petal Rose</div>
+          <div class="palette__sub">current · brand</div>
+        </div>
+        <div class="palette__rows">
+          <div class="palette__row"><span class="sw" data-r="bg"></span><span class="role">Canvas</span><span class="hex">Petal White</span></div>
+          <div class="palette__row"><span class="sw" data-r="surface"></span><span class="role">Surface</span><span class="hex">Pure white</span></div>
+          <div class="palette__row"><span class="sw" data-r="accent"></span><span class="role">Accent</span><span class="hex">Dusty Rose</span></div>
+          <div class="palette__row"><span class="sw" data-r="income"></span><span class="role">Income</span><span class="hex">Sage Teal</span></div>
+          <div class="palette__row"><span class="sw" data-r="fg"></span><span class="role">Text</span><span class="hex">Deep Plum</span></div>
+        </div>
+        <p class="palette__use">The literal brand. Warm pink canvas, rose accent, sage income — calm, anti-clinical, unambiguously Florin.</p>
+      </button>
+
+      <button class="palette palette--forest-linen" data-target="forest-linen">
+        <div class="palette__head">
+          <div class="palette__name">Forest Linen</div>
+          <div class="palette__sub">leaf-led · cool</div>
+        </div>
+        <div class="palette__rows">
+          <div class="palette__row"><span class="sw" data-r="bg"></span><span class="role">Canvas</span><span class="hex">Cool Linen</span></div>
+          <div class="palette__row"><span class="sw" data-r="surface"></span><span class="role">Surface</span><span class="hex">Pure white</span></div>
+          <div class="palette__row"><span class="sw" data-r="accent"></span><span class="role">Accent</span><span class="hex">Deep Sage</span></div>
+          <div class="palette__row"><span class="sw" data-r="income"></span><span class="role">Income</span><span class="hex">Forest Teal</span></div>
+          <div class="palette__row"><span class="sw" data-r="fg"></span><span class="role">Text</span><span class="hex">Deep Forest</span></div>
+        </div>
+        <p class="palette__use">Pulls from the lily's leaves instead of its petals — botanical, grounded, less feminine. Terracotta carries expense.</p>
+      </button>
+
+      <button class="palette palette--plum-night" data-target="plum-night">
+        <div class="palette__head">
+          <div class="palette__name">Plum Night</div>
+          <div class="palette__sub">dark · low-light</div>
+        </div>
+        <div class="palette__rows">
+          <div class="palette__row"><span class="sw" data-r="bg"></span><span class="role">Canvas</span><span class="hex">Deep Plum</span></div>
+          <div class="palette__row"><span class="sw" data-r="surface"></span><span class="role">Surface</span><span class="hex">Plum 800</span></div>
+          <div class="palette__row"><span class="sw" data-r="accent"></span><span class="role">Accent</span><span class="hex">Soft Rose</span></div>
+          <div class="palette__row"><span class="sw" data-r="income"></span><span class="role">Income</span><span class="hex">Mint</span></div>
+          <div class="palette__row"><span class="sw" data-r="fg"></span><span class="role">Text</span><span class="hex">Petal 50</span></div>
+        </div>
+        <p class="palette__use">The dark mode that already exists in the brand spec, executed as its own scheme. Late-night budgeting, kind on tired eyes.</p>
+      </button>
+
+      <button class="palette palette--nordic-mist" data-target="nordic-mist">
+        <div class="palette__head">
+          <div class="palette__name">Nordic Mist</div>
+          <div class="palette__sub">cool · minimal</div>
+        </div>
+        <div class="palette__rows">
+          <div class="palette__row"><span class="sw" data-r="bg"></span><span class="role">Canvas</span><span class="hex">Mist White</span></div>
+          <div class="palette__row"><span class="sw" data-r="surface"></span><span class="role">Surface</span><span class="hex">Pure white</span></div>
+          <div class="palette__row"><span class="sw" data-r="accent"></span><span class="role">Accent</span><span class="hex">Dusty Teal</span></div>
+          <div class="palette__row"><span class="sw" data-r="income"></span><span class="role">Income</span><span class="hex">Emerald</span></div>
+          <div class="palette__row"><span class="sw" data-r="fg"></span><span class="role">Text</span><span class="hex">Navy 900</span></div>
+        </div>
+        <p class="palette__use">Strips the warmth out and leans modern-minimal. For users who associate finance with neutral, precise, almost software-native UI.</p>
+      </button>
+
+      <button class="palette palette--honey-cream" data-target="honey-cream">
+        <div class="palette__head">
+          <div class="palette__name">Honey Cream</div>
+          <div class="palette__sub">warm · amber-led</div>
+        </div>
+        <div class="palette__rows">
+          <div class="palette__row"><span class="sw" data-r="bg"></span><span class="role">Canvas</span><span class="hex">Cream</span></div>
+          <div class="palette__row"><span class="sw" data-r="surface"></span><span class="role">Surface</span><span class="hex">Pure white</span></div>
+          <div class="palette__row"><span class="sw" data-r="accent"></span><span class="role">Accent</span><span class="hex">Amber Rust</span></div>
+          <div class="palette__row"><span class="sw" data-r="income"></span><span class="role">Income</span><span class="hex">Olive</span></div>
+          <div class="palette__row"><span class="sw" data-r="fg"></span><span class="role">Text</span><span class="hex">Espresso</span></div>
+        </div>
+        <p class="palette__use">Keeps Florin's warmth but trades the pink for amber and olive — closer to a kitchen-table ledger than a beauty product.</p>
+      </button>
+
+    </div>
+  </section>
+
+  <div class="footer-line">
+    <span>florin · color explorations · 5 schemes</span>
+    <span>your last pick is remembered locally</span>
+  </div>
+
+</main>
+
+<script>
+  (function () {
+    const STORAGE_KEY = 'florin.color-scheme';
+    const VALID = ['petal-rose', 'forest-linen', 'plum-night', 'nordic-mist', 'honey-cream'];
+
+    const tabs = Array.from(document.querySelectorAll('.scheme-tab'));
+    const palettes = Array.from(document.querySelectorAll('.palette'));
+
+    function apply(scheme, opts) {
+      if (!VALID.includes(scheme)) scheme = 'petal-rose';
+      document.body.setAttribute('data-scheme', scheme);
+
+      tabs.forEach(t => {
+        const isActive = t.dataset.target === scheme;
+        t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        t.tabIndex = isActive ? 0 : -1;
+      });
+      palettes.forEach(p => {
+        p.dataset.current = (p.dataset.target === scheme) ? 'true' : 'false';
+      });
+
+      try { localStorage.setItem(STORAGE_KEY, scheme); } catch (e) { /* ignore */ }
+
+      if (opts && opts.focusTab) {
+        const t = tabs.find(x => x.dataset.target === scheme);
+        if (t) t.focus();
+      }
+    }
+
+    // Click handlers (tabs + palette cards)
+    tabs.forEach(t => {
+      t.addEventListener('click', () => apply(t.dataset.target));
+    });
+    palettes.forEach(p => {
+      p.addEventListener('click', () => apply(p.dataset.target));
+    });
+
+    // Keyboard navigation between tabs (arrow keys, Home/End)
+    const tablist = document.querySelector('.schemes');
+    tablist.addEventListener('keydown', (e) => {
+      const currentIndex = tabs.findIndex(t => t.getAttribute('aria-selected') === 'true');
+      let nextIndex = currentIndex;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        nextIndex = (currentIndex + 1) % tabs.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      } else if (e.key === 'Home') {
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        nextIndex = tabs.length - 1;
+      } else {
+        return;
+      }
+      e.preventDefault();
+      apply(tabs[nextIndex].dataset.target, { focusTab: true });
+    });
+
+    // Restore last picked scheme
+    let saved = null;
+    try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+    if (saved && VALID.includes(saved)) apply(saved);
+  })();
+</script>
+
+</body>
+</html>
