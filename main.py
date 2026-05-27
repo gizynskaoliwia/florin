@@ -3766,6 +3766,12 @@ class SettingsView(ctk.CTkFrame):
             dm.edit_cashflow_target(tid, name=name, target_amount=amt)
             self.controller.config = dm.get_config()
 
+    def toggle_shared_goals(self):
+        val = self.shared_goals_var.get()
+        self.controller.config["enable_shared_goals"] = val
+        dm.save_config(self.controller.config)
+        self.controller.refresh_sidebar()
+
     def refresh(self):
         self.build_income_items()
         self.build_settings_categories()
