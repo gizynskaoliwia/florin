@@ -242,6 +242,7 @@ class FlorinApp(ctk.CTk):
             ("Savings", "🌱", "nav.savings"),
             ("Cash Flow", "💧", "nav.cashflow"),
             ("History", "📅", "nav.history"),
+            ("Shared Goals", "🎯", "nav.shared_goals"),
         ]
 
         nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -368,6 +369,7 @@ class FlorinApp(ctk.CTk):
         self.views["Savings"] = SavingsView(self.main_container, self)
         self.views["Cash Flow"] = CashFlowView(self.main_container, self)
         self.views["History"] = HistoryView(self.main_container, self)
+        self.views["Shared Goals"] = SharedGoalsView(self.main_container, self)
         self.views["Settings"] = SettingsView(self.main_container, self)
         self.views["Help"] = HelpView(self.main_container, self)
         
