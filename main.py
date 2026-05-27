@@ -3770,7 +3770,7 @@ class SettingsView(ctk.CTkFrame):
         val = self.shared_goals_var.get()
         self.controller.config["enable_shared_goals"] = val
         dm.save_config(self.controller.config)
-        self.controller.refresh_sidebar()
+        self.controller.rebuild_shell("Settings")
 
     def refresh(self):
         self.build_income_items()
