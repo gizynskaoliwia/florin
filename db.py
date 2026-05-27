@@ -215,6 +215,16 @@ CREATE TABLE IF NOT EXISTS shared_goals_data (
     PRIMARY KEY (goal_id, month_key, person_id)
 );
 
+-- Emergency fund settings (Personal and Shared)
+CREATE TABLE IF NOT EXISTS emergency_fund_settings (
+    mode TEXT PRIMARY KEY,
+    salary REAL NOT NULL DEFAULT 0.0,
+    mortgage REAL NOT NULL DEFAULT 0.0,
+    living_expenses REAL NOT NULL DEFAULT 0.0,
+    selected_goal TEXT NOT NULL DEFAULT '3msc_zycia',
+    actual_saved REAL NOT NULL DEFAULT 0.0
+);
+
 -- Migration tracking
 CREATE TABLE IF NOT EXISTS migrations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

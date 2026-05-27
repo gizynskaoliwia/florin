@@ -243,6 +243,7 @@ class FlorinApp(ctk.CTk):
             ("Cash Flow", "💧", "nav.cashflow"),
             ("History", "📅", "nav.history"),
             ("Shared Goals", "🎯", "nav.shared_goals"),
+            ("Emergency Fund", "☂️", "nav.emergency_fund"),
         ]
 
         nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -251,6 +252,8 @@ class FlorinApp(ctk.CTk):
         
         for name, icon, label_key in main_items:
             if name == "Shared Goals" and self.config.get("enable_shared_goals", "true") != "true":
+                continue
+            if name == "Emergency Fund" and self.config.get("enable_emergency_fund", "false") != "true":
                 continue
             self._sidebar_nav_item(nav_frame, name, icon, t(label_key))
 
@@ -370,6 +373,8 @@ class FlorinApp(ctk.CTk):
         self.views["Cash Flow"] = CashFlowView(self.main_container, self)
         self.views["History"] = HistoryView(self.main_container, self)
         self.views["Shared Goals"] = SharedGoalsView(self.main_container, self)
+        from views.emergency_fund import EmergencyFundView
+        self.views["Emergency Fund"] = EmergencyFundView(self.main_container, self)
         self.views["Settings"] = SettingsView(self.main_container, self)
         self.views["Help"] = HelpView(self.main_container, self)
         
@@ -3571,6 +3576,57 @@ class SettingsView(ctk.CTkFrame):
             progress_color=COLOR_PRIMARY
         )
         sw.pack(anchor="w", padx=24, pady=(16, 24))
+        
+        self.emergency_fund_var = ctk.StringVar(value=self.controller.config.get("enable_emergency_fund", "false"))
+        sw2 = ctk.CTkSwitch(
+            feat_card,
+            text=t("settings.enable_emergency_fund"),
+            variable=self.emergency_fund_var,
+            onvalue="true",
+            offvalue="false",
+            command=self.toggle_emergency_fund,
+            font=FONT_BODY,
+            fg_color=COLOR_BORDER,
+            progress_color=COLOR_PRIMARY
+        )
+        sw2.pack(anchor="w", padx=24, pady=(0, 24))
+
+        # === Emergency Fund Settings ===
+        ef_card = make_card(self.scroll)
+        ef_card.pack(fill="x", pady=(0, 24))
+        self.section_widgets["Emergency Fund Settings"] = ef_card
+        self._settings_section_header(ef_card, t("Emergency Fund Settings"), "")
+        
+        self.ef_mode_var = ctk.StringVar(value="personal")
+        self.ef_salary_var = ctk.StringVar(value="0.0")
+        self.ef_mortgage_var = ctk.StringVar(value="0.0")
+        self.ef_living_var = ctk.StringVar(value="0.0")
+        self.ef_actual_var = ctk.StringVar(value="0.0")
+        self.ef_goal_var = ctk.StringVar(value="3msc_zycia")
+        
+        ef_body = ctk.CTkFrame(ef_card, fg_color="transparent")
+        ef_body.pack(fill="x", padx=24, pady=(0, 24))
+        
+        # Mode selector
+        mode_frame = ctk.CTkFrame(ef_body, fg_color="transparent")
+        mode_frame.pack(fill="x", pady=5)
+        ctk.CTkLabel(mode_frame, text=t("Mode:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
+        ctk.CTkOptionMenu(mode_frame, variable=self.ef_mode_var, values=["personal", "shared"], command=self.load_ef_settings).pack(side="left")
+        
+        # Inputs
+        self._ef_input(ef_body, t("Salary (Wypłata)"), self.ef_salary_var)
+        self._ef_input(ef_body, t("Mortgage/Loan (Kredyt)"), self.ef_mortgage_var)
+        self._ef_input(ef_body, t("Living Expenses (Do życia)"), self.ef_living_var)
+        self._ef_input(ef_body, t("Actual Saved:"), self.ef_actual_var)
+        
+        # Goal dropdown
+        goal_frame = ctk.CTkFrame(ef_body, fg_color="transparent")
+        goal_frame.pack(fill="x", pady=5)
+        ctk.CTkLabel(goal_frame, text=t("Goal:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
+        ctk.CTkOptionMenu(goal_frame, variable=self.ef_goal_var, values=["3msc_zycia", "6msc_zycia", "3msc_kredytu", "6msc_kredytu", "3msc_zycia_kredytu", "6msc_zycia_kredytu", "3msc_wyplaty", "6msc_wyplaty"]).pack(side="left")
+        
+        ctk.CTkButton(ef_body, text=t("Save changes"), command=self.save_ef_settings, fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER).pack(pady=15)
+        self.load_ef_settings("personal")
 
         # === Data & backup ===
         data_card = make_card(self.scroll)
@@ -3773,6 +3829,43 @@ class SettingsView(ctk.CTkFrame):
         self.controller.config["enable_shared_goals"] = val
         dm.save_config(self.controller.config)
         self.controller.rebuild_shell("Settings")
+
+    def toggle_emergency_fund(self):
+        val = self.emergency_fund_var.get()
+        self.controller.config["enable_emergency_fund"] = val
+        dm.save_config(self.controller.config)
+        self.controller.rebuild_shell("Settings")
+        
+    def _ef_input(self, parent, label_text, var):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=5)
+        ctk.CTkLabel(row, text=label_text, font=FONT_TITLE, width=150, anchor="w").pack(side="left")
+        ctk.CTkEntry(row, textvariable=var, font=FONT_MONO, width=150).pack(side="left")
+
+    def load_ef_settings(self, mode):
+        settings = dm.get_emergency_fund_settings()
+        data = settings.get(mode, {})
+        self.ef_salary_var.set(str(data.get("salary", 0.0)))
+        self.ef_mortgage_var.set(str(data.get("mortgage", 0.0)))
+        self.ef_living_var.set(str(data.get("living_expenses", 0.0)))
+        self.ef_actual_var.set(str(data.get("actual_saved", 0.0)))
+        self.ef_goal_var.set(data.get("selected_goal", "3msc_zycia"))
+
+    def save_ef_settings(self):
+        mode = self.ef_mode_var.get()
+        try:
+            data = {
+                "salary": float(self.ef_salary_var.get().replace(",", ".")),
+                "mortgage": float(self.ef_mortgage_var.get().replace(",", ".")),
+                "living_expenses": float(self.ef_living_var.get().replace(",", ".")),
+                "actual_saved": float(self.ef_actual_var.get().replace(",", ".")),
+                "selected_goal": self.ef_goal_var.get()
+            }
+            dm.save_emergency_fund_settings(mode, data)
+            if "Emergency Fund" in self.controller.views:
+                self.controller.views["Emergency Fund"].refresh()
+        except ValueError:
+            pass
 
     def refresh(self):
         self.build_income_items()

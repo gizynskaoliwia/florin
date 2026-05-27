@@ -844,3 +844,40 @@ def inject_shared_goals_example_data():
                 save_shared_goals(goals)
         except Exception:
             pass
+
+# --- Emergency Fund ---
+def get_emergency_fund_settings():
+    init_env()
+    conn = get_connection()
+    # Initialize default rows if they don't exist
+    for mode in ["personal", "shared"]:
+        row = conn.execute("SELECT * FROM emergency_fund_settings WHERE mode = ?", (mode,)).fetchone()
+        if not row:
+            conn.execute(
+                "INSERT INTO emergency_fund_settings (mode, salary, mortgage, living_expenses, selected_goal, actual_saved) VALUES (?, 0.0, 0.0, 0.0, '3msc_zycia', 0.0)",
+                (mode,)
+            )
+            conn.commit()
+            
+    rows = conn.execute("SELECT * FROM emergency_fund_settings").fetchall()
+    res = {}
+    for r in rows:
+        res[r["mode"]] = {
+            "salary": r["salary"],
+            "mortgage": r["mortgage"],
+            "living_expenses": r["living_expenses"],
+            "selected_goal": r["selected_goal"],
+            "actual_saved": r["actual_saved"]
+        }
+    return res
+
+def save_emergency_fund_settings(mode, data):
+    conn = get_connection()
+    conn.execute(
+        """UPDATE emergency_fund_settings 
+           SET salary = ?, mortgage = ?, living_expenses = ?, selected_goal = ?, actual_saved = ?
+           WHERE mode = ?""",
+        (data.get("salary", 0.0), data.get("mortgage", 0.0), data.get("living_expenses", 0.0), 
+         data.get("selected_goal", "3msc_zycia"), data.get("actual_saved", 0.0), mode)
+    )
+    conn.commit()

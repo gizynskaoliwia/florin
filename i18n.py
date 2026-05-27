@@ -94,6 +94,8 @@ _STRINGS = {
         "shared.status": "Status",
         "shared.totals": "Totals",
         "settings.enable_shared_goals": "Enable Shared Goals",
+        "nav.emergency_fund": "Emergency Fund",
+        "settings.enable_emergency_fund": "Enable Emergency Fund",
     },
     "pl": {
         "nav.dashboard": "Panel",
@@ -184,6 +186,8 @@ _STRINGS = {
         "shared.status": "Status",
         "shared.totals": "Razem",
         "settings.enable_shared_goals": "Włącz Cele Wspólne",
+        "nav.emergency_fund": "Poduszka Finansowa",
+        "settings.enable_emergency_fund": "Włącz Poduszkę Finansową",
     },
 }
 
@@ -332,6 +336,25 @@ _TEXT_TRANSLATIONS_PL = {
     "Invalid date. Use DD/MM/YYYY format.": "Nieprawidłowa data. Użyj formatu DD/MM/RRRR.",
     "Enter a valid percentage.": "Wpisz poprawny procent.",
     "Name is required and percent cannot be negative.": "Nazwa jest wymagana, a procent nie może być ujemny.",
+    "Salary (Wypłata)": "Wypłata",
+    "Mortgage/Loan (Kredyt)": "Kredyt",
+    "Living Expenses (Do życia)": "Do życia",
+    "Emergency Fund Settings": "Ustawienia poduszki finansowej",
+    "Mode:": "Tryb:",
+    "Personal (JA)": "Osobisty (JA)",
+    "Shared (WSPÓLNE)": "Wspólny (WSPÓLNE)",
+    "Goal:": "Cel:",
+    "Actual Saved:": "Aktualnie zebrane:",
+    "3 months of living": "3msc życia",
+    "6 months of living": "6msc życia",
+    "3 months of loan": "3msc kredytu",
+    "6 months of loan": "6msc kredytu",
+    "3 months of living + loan": "3msc życia + kredytu",
+    "6 months of living + loan": "6msc życia + kredytu",
+    "3 months of salary": "3msc wypłaty",
+    "6 months of salary": "6msc wypłaty",
+    "Target Goal": "Cel docelowy",
+    "Missing to goal": "Brakuje do celu",
 }
 
 _MONTHS = {

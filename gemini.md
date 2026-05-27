@@ -51,6 +51,7 @@ Phase 1 builds the core app. Features in order of priority:
 6. **Cash flow buffer** — minimum balance calculator with top-up amounts and savings remainder
 7. **History tab** — monthly snapshots, manual account balances
 8. **Settings** — edit category names, percentages, buffer minimums
+9. **Shared Goals** — track long-term savings goals shared with another person
 
 ---
 
@@ -326,7 +327,20 @@ Remaining for savings:     Y − X = Z PLN
 - **Cash Flow Buffer minimums:** edit minimum per buffer category
 - **Business income defaults:** pre-fill deduction fields (VAT, tax, ZUS) from last month
 - **Import from Excel:** file picker, password input, sheet name selector
+- **Features:** toggle experimental features like Shared Goals
 - **Data:** export current month to JSON, clear current month, open data folder
+
+---
+
+### 8. Shared Goals (Experimental)
+
+**Location:** Navigation sidebar (when enabled in Settings)
+**Purpose:** Track planned and actual savings for long-term shared goals with another person.
+
+**Features:**
+- Add people to a shared goal
+- Enter planned vs actual contributions per month per person
+- See combined totals and a status indicator (Green=Target Met, Yellow/Red=Below Target)
 
 ---
 
