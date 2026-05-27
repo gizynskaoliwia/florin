@@ -410,6 +410,11 @@ class FlorinApp(ctk.CTk):
         self.setup_views()
         self.show_view(view_name if view_name in self.views else "Dashboard")
         
+    def refresh_sidebar(self):
+        if hasattr(self, "sidebar"):
+            self.sidebar.destroy()
+        self.setup_sidebar()
+        
     def save_data(self):
         dm.save_month(self.current_month, self.data)
 
@@ -3415,7 +3420,8 @@ class SettingsView(ctk.CTkFrame):
             ("Categories", "settings.nav.categories"),
             ("Appearance", "settings.nav.appearance"),
             ("Language", "settings.nav.language"),
-            ("Features", "nav.shared_goals"),
+            ("Features", "settings.nav.features"),
+            ("Emergency Fund Settings", "settings.nav.emergency_fund"),
             ("Data & backup", "settings.nav.data"),
         ]
         for i, (section_key, label_key) in enumerate(sections):
@@ -3828,13 +3834,13 @@ class SettingsView(ctk.CTkFrame):
         val = self.shared_goals_var.get()
         self.controller.config["enable_shared_goals"] = val
         dm.save_config(self.controller.config)
-        self.controller.rebuild_shell("Settings")
+        self.controller.refresh_sidebar()
 
     def toggle_emergency_fund(self):
         val = self.emergency_fund_var.get()
         self.controller.config["enable_emergency_fund"] = val
         dm.save_config(self.controller.config)
-        self.controller.rebuild_shell("Settings")
+        self.controller.refresh_sidebar()
         
     def _ef_input(self, parent, label_text, var):
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -4158,11 +4164,6 @@ class HelpView(ctk.CTkFrame):
             self._no_results_lbl = ctk.CTkLabel(self._scroll, text=t("help.no_results"), font=FONT_BODY, text_color=COLOR_TEXT_MUTED)
             self._no_results_lbl.pack(pady=20)
 
-    def toggle_shared_goals(self):
-        val = self.shared_goals_var.get()
-        self.controller.config["enable_shared_goals"] = val
-        dm.save_config(self.controller.config)
-        self.controller.refresh_sidebar()
 
     def refresh(self):
         pass  # Static content, no refresh needed
