@@ -250,7 +250,7 @@ class FlorinApp(ctk.CTk):
         self._sidebar_section_label(nav_frame, t("nav.section.main"))
         
         for name, icon, label_key in main_items:
-            if name == "Shared Goals" and self.config.get("enable_shared_goals", "false") != "true":
+            if name == "Shared Goals" and self.config.get("enable_shared_goals", "true") != "true":
                 continue
             self._sidebar_nav_item(nav_frame, name, icon, t(label_key))
 
@@ -3558,7 +3558,7 @@ class SettingsView(ctk.CTkFrame):
         self.section_widgets["Features"] = feat_card
         self._settings_section_header(feat_card, "Features", "Enable experimental or extra features.")
         
-        self.shared_goals_var = ctk.StringVar(value=self.controller.config.get("enable_shared_goals", "false"))
+        self.shared_goals_var = ctk.StringVar(value=self.controller.config.get("enable_shared_goals", "true"))
         sw = ctk.CTkSwitch(
             feat_card,
             text=t("settings.enable_shared_goals"),

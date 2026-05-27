@@ -834,34 +834,13 @@ def inject_shared_goals_example_data():
     conn = get_connection()
     count = conn.execute("SELECT COUNT(*) FROM shared_goals").fetchone()[0]
     if count == 0:
-        goal1_id = generate_id()
-        p1_id = generate_id()
-        p2_id = generate_id()
-        
-        goal2_id = generate_id()
-        p3_id = generate_id()
-        p4_id = generate_id()
-        
-        goals = [
-            {
-                "id": goal1_id,
-                "name": "House",
-                "persons": [{"id": p1_id, "name": "Oliwia"}, {"id": p2_id, "name": "Michał"}],
-                "data": {
-                    "2024-09": {p1_id: {"planned": 5000, "actual": 5000}, p2_id: {"planned": 5000, "actual": 5000}},
-                    "2024-10": {p1_id: {"planned": 5000, "actual": 4500}, p2_id: {"planned": 5000, "actual": 5000}},
-                    "2024-11": {p1_id: {"planned": 5000, "actual": 0}, p2_id: {"planned": 5000, "actual": 0}}
-                }
-            },
-            {
-                "id": goal2_id,
-                "name": "Wedding",
-                "persons": [{"id": p3_id, "name": "Oliwia"}, {"id": p4_id, "name": "Michał"}],
-                "data": {
-                    "2024-09": {p3_id: {"planned": 2000, "actual": 2000}, p4_id: {"planned": 2000, "actual": 2000}},
-                    "2024-10": {p3_id: {"planned": 2000, "actual": 2500}, p4_id: {"planned": 2000, "actual": 2000}},
-                    "2024-11": {p3_id: {"planned": 2000, "actual": 0}, p4_id: {"planned": 2000, "actual": 0}}
-                }
-            }
-        ]
-        save_shared_goals(goals)
+        import json
+        from pathlib import Path
+        try:
+            default_path = Path(__file__).parent / "shared_goals_default.json"
+            if default_path.exists():
+                with open(default_path, "r", encoding="utf-8") as f:
+                    goals = json.load(f)
+                save_shared_goals(goals)
+        except Exception:
+            pass
