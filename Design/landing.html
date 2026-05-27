@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Florin — Rise above your finances</title>
+<link rel="icon" href="assets/logo.png" />
+<link rel="stylesheet" href="assets/florin.css" />
+<style>
+  /* ===== Landing-only styles ===== */
+  body.landing {
+    background:
+      radial-gradient(1200px 600px at 50% -200px, oklch(95% 0.04 350) 0%, var(--bg) 60%),
+      var(--bg);
+  }
+  .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+  /* Nav */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(12px);
+    background: oklch(97.5% 0.012 350 / 0.85);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav__inner { display: flex; align-items: center; gap: 32px; height: 72px; }
+  .nav__brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--fg); text-decoration: none; }
+  .nav__brand img { width: 32px; height: 32px; border-radius: 50%; }
+  .nav__links { display: flex; gap: 28px; flex: 1; justify-content: center; }
+  .nav__links a { color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: none; }
+  .nav__links a:hover { color: var(--fg); text-decoration: none; }
+  .nav__cta { display: flex; gap: 10px; align-items: center; }
+
+  /* Hero */
+  .hero { padding: 80px 0 64px; }
+  .hero__inner { display: grid; grid-template-columns: 1.05fr 1fr; gap: 64px; align-items: center; }
+  .hero__eyebrow { display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 24px; }
+  .hero h1 {
+    font-size: clamp(44px, 5.4vw, 76px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+  .hero h1 em { font-style: italic; color: var(--accent); font-weight: 500; }
+  .hero p.lede { font-size: 19px; color: var(--muted); max-width: 520px; margin-bottom: 32px; }
+  .hero__cta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .hero__meta { margin-top: 20px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .hero__meta span { display: inline-flex; gap: 6px; align-items: center; }
+  .hero__meta .check { color: var(--success); font-weight: 800; }
+
+  /* Hero mockup — recreated app preview, intentionally compact */
+  .preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow:
+      0 1px 2px oklch(20% 0.02 340 / 0.06),
+      0 30px 60px -20px oklch(50% 0.06 340 / 0.25);
+    position: relative;
+  }
+  .preview__chrome { height: 28px; background: oklch(96% 0.018 350); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; gap: 6px; }
+  .preview__chrome span { width: 9px; height: 9px; border-radius: 50%; }
+  .preview__chrome span:nth-child(1){ background:#FF5F57; } .preview__chrome span:nth-child(2){ background:#FEBC2E; } .preview__chrome span:nth-child(3){ background:#28C840; }
+  .preview__body { display: grid; grid-template-columns: 56px 1fr; height: 380px; }
+  .preview__rail {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .preview__rail .logo { width: 32px; height: 32px; border-radius: 50%; }
+  .preview__rail .ico { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
+  .preview__rail .ico.is-active { background: var(--accent-soft); color: var(--accent); }
+  .preview__main { padding: 18px 20px; background: var(--bg); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .preview__row { display: flex; gap: 10px; }
+  .preview__card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; flex: 1; }
+  .preview__card .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+  .preview__card .big { font-family: var(--font-mono); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .preview__card .big.income { color: var(--income); }
+  .preview__card .small { font-family: var(--font-mono); font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .preview__catrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .preview__catrow:last-child { border: 0; }
+  .preview__catrow .name { flex: 1; font-weight: 600; }
+  .preview__catrow .num { font-size: 12px; }
+
+  /* Problem section */
+  .problem { padding: 96px 0 64px; }
+  .problem__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+  .problem h2 { margin-bottom: 16px; }
+  .problem p { font-size: 17px; color: var(--muted); max-width: 480px; }
+  .problem__quotes { display: flex; flex-direction: column; gap: 14px; }
+  .quote {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 22px;
+    font-size: 15px;
+    color: var(--fg);
+    position: relative;
+  }
+  .quote::before {
+    content: ""; position: absolute; left: 0; top: 16px; bottom: 16px;
+    width: 3px; background: var(--accent); border-radius: 2px;
+  }
+  .quote em { color: var(--muted); display: block; margin-top: 6px; font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--font-mono); }
+
+  /* Features */
+  .features { padding: 80px 0; }
+  .features__head { max-width: 720px; margin: 0 auto 48px; text-align: center; }
+  .features__head .eyebrow { display: inline-block; margin-bottom: 12px; }
+  .features__head h2 { margin-bottom: 14px; }
+  .features__head p { font-size: 17px; color: var(--muted); }
+  .features__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .feature {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 28px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .feature__num { font-family: var(--font-mono); font-size: 11px; color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; font-weight: 600; }
+  .feature h3 { font-size: 22px; }
+  .feature p { color: var(--muted); margin: 0; }
+  .feature__demo { background: var(--surface-2); border-radius: 12px; padding: 16px; margin-top: auto; border: 1px solid var(--border); }
+
+  /* Net income mini calc */
+  .calc-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+  .calc-row .lbl { color: var(--muted); font-weight: 600; }
+  .calc-row .num { font-size: 13px; }
+  .calc-divider { border-top: 1px dashed var(--border); margin: 6px 0; }
+  .calc-total { display: flex; justify-content: space-between; padding-top: 6px; }
+  .calc-total .lbl { font-weight: 800; color: var(--fg); font-size: 13px; }
+  .calc-total .num { font-size: 16px; color: var(--income); font-weight: 700; }
+
+  /* Category demo */
+  .cat-demo { display: flex; flex-direction: column; gap: 8px; }
+  .cat-row { display: flex; align-items: center; gap: 10px; }
+  .cat-row .name { font-size: 12px; font-weight: 700; flex: 1; }
+  .cat-row .num { font-size: 12px; }
+  .cat-bar { height: 6px; border-radius: 999px; background: var(--surface); overflow: hidden; }
+  .cat-bar > span { display: block; height: 100%; border-radius: 999px; }
+
+  /* Expense demo */
+  .exp-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; border-bottom: 1px dashed var(--border); }
+  .exp-row:last-child { border: 0; }
+  .exp-row .desc { flex: 1; font-weight: 600; }
+  .exp-row .num { font-size: 13px; color: var(--expense); }
+
+  /* Buffer demo */
+  .buf-row { display: flex; align-items: center; padding: 6px 0; font-size: 13px; gap: 8px; }
+  .buf-row .name { flex: 1; font-weight: 600; }
+  .buf-bar { width: 80px; }
+  .buf-row .num { font-size: 12px; min-width: 60px; text-align: right; }
+
+  /* Privacy section */
+  .privacy { padding: 96px 0; background: linear-gradient(180deg, transparent, oklch(95% 0.025 350) 50%, transparent); }
+  .privacy__inner { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: center; }
+  .privacy h2 { margin-bottom: 16px; }
+  .privacy p { font-size: 17px; color: var(--muted); margin-bottom: 14px; max-width: 480px; }
+  .privacy__list { display: grid; gap: 14px; margin-top: 24px; }
+  .privacy__item { display: flex; gap: 14px; align-items: flex-start; }
+  .privacy__item .ico {
+    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent); font-size: 16px; font-weight: 800;
+  }
+  .privacy__item h4 { margin: 0 0 4px; font-size: 15px; font-weight: 700; }
+  .privacy__item p { font-size: 14px; color: var(--muted); margin: 0; }
+
+  .privacy__visual {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .privacy__visual::before {
+    content: ""; position: absolute; right: -60px; top: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(closest-side, var(--accent-soft), transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .privacy__file {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
+    font-family: var(--font-mono); font-size: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    color: var(--fg);
+  }
+  .privacy__file .pl { color: var(--accent); font-weight: 700; }
+  .privacy__diagram {
+    margin-top: 18px; display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px dashed var(--border); border-radius: 12px;
+  }
+  .privacy__node {
+    flex: 1; text-align: center; font-size: 12px; color: var(--muted);
+  }
+  .privacy__node .ico {
+    width: 48px; height: 48px; margin: 0 auto 6px; border-radius: 12px;
+    background: var(--surface-2); display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .privacy__node.cloud { opacity: 0.4; position: relative; }
+  .privacy__node.cloud::after {
+    content: ""; position: absolute; left: 18%; right: 18%; top: 32%;
+    height: 1.5px; background: var(--error); transform: rotate(-12deg);
+  }
+  .privacy__arrow { font-family: var(--font-mono); color: var(--faint); }
+
+  /* Bilingual / open source side */
+  .strip { padding: 64px 0; }
+  .strip__grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .strip__card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-card); padding: 24px; min-height: 180px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .strip__card h4 { font-family: var(--font-display); font-size: 22px; font-weight: 600; margin: 0; }
+  .strip__card p { font-size: 14px; color: var(--muted); margin: 0; }
+  .strip__card .meta { margin-top: auto; }
+
+  /* CTA */
+  .cta {
+    padding: 96px 0;
+  }
+  .cta__inner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 64px 48px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta__inner::before {
+    content: ""; position: absolute; left: 50%; top: -100px; transform: translateX(-50%);
+    width: 460px; height: 460px;
+    background: radial-gradient(closest-side, var(--accent-soft), transparent 70%);
+    pointer-events: none;
+  }
+  .cta__inner > * { position: relative; }
+  .cta h2 { margin-bottom: 14px; max-width: 720px; margin-inline: auto; }
+  .cta p { font-size: 17px; color: var(--muted); margin: 0 auto 28px; max-width: 560px; }
+  .cta__row { display: inline-flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .cta__platforms { margin-top: 24px; display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+  /* Footer */
+  .footer { padding: 48px 0 64px; border-top: 1px solid var(--border); margin-top: 48px; }
+  .footer__inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .footer__left { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+  .footer__left img { width: 28px; height: 28px; border-radius: 50%; }
+  .footer__links { display: flex; gap: 24px; font-size: 13px; }
+  .footer__links a { color: var(--muted); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 980px) {
+    .container { padding: 0 20px; }
+    .nav__links { display: none; }
+    .hero { padding: 56px 0 48px; }
+    .hero__inner, .problem__grid, .privacy__inner { grid-template-columns: 1fr; gap: 40px; }
+    .features__grid { grid-template-columns: 1fr; }
+    .strip__grid { grid-template-columns: 1fr; }
+    .cta__inner { padding: 48px 24px; }
+  }
+  @media (max-width: 600px) {
+    .preview__body { height: 320px; }
+    .hero h1 { font-size: 40px; }
+    .hero p.lede { font-size: 16px; }
+    .footer__inner { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body class="landing">
+
+<header class="nav">
+  <div class="container nav__inner">
+    <a class="nav__brand" href="#top">
+      <img src="assets/logo.png" alt="Florin" />
+      Florin
+    </a>
+    <nav class="nav__links">
+      <a href="#problem">Why Florin</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#download">Download</a>
+    </nav>
+    <div class="nav__cta">
+      <a class="btn btn--ghost btn--sm" href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+      <a class="btn btn--primary btn--sm" href="#download">Download</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container hero__inner">
+      <div>
+        <span class="hero__eyebrow eyebrow"><span class="dot">●</span> For freelancers &amp; sole proprietors</span>
+        <h1>Rise above your <em>finances.</em></h1>
+        <p class="lede">
+          Florin is a calm, local-first budget tracker for people whose income changes every month. From gross invoice to net pay, category split, expense tracking, and cash-flow buffer — one quiet desktop app that holds the whole picture.
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--primary btn--lg" href="#download">Download for macOS &amp; Windows</a>
+          <a class="btn btn--secondary btn--lg" href="#features">See how it works</a>
+        </div>
+        <div class="hero__meta">
+          <span><span class="check">✓</span> 100% local — no cloud, no account</span>
+          <span><span class="check">✓</span> Free &amp; open source (MIT)</span>
+          <span><span class="check">✓</span> English &amp; Polish</span>
+        </div>
+      </div>
+
+      <!-- Recreated mini app preview -->
+      <div class="preview" aria-hidden="true">
+        <div class="preview__chrome"><span></span><span></span><span></span></div>
+        <div class="preview__body">
+          <div class="preview__rail">
+            <img class="logo" src="assets/logo.png" alt="" />
+            <div class="ico is-active">✦</div>
+            <div class="ico">💰</div>
+            <div class="ico">🧾</div>
+            <div class="ico">💧</div>
+            <div class="ico">📅</div>
+          </div>
+          <div class="preview__main">
+            <div class="preview__row">
+              <div class="preview__card">
+                <div class="lbl">Net income · April</div>
+                <div class="big income">6 960,98<span style="font-size:13px;color:var(--muted);font-weight:500;"> PLN</span></div>
+                <div class="small">Gross 13 000,00 − VAT 2 430,89 − Tax 2 008,13 − ZUS 1 600,00</div>
+              </div>
+            </div>
+            <div class="preview__row">
+              <div class="preview__card" style="flex: 1.2;">
+                <div class="lbl">Category split</div>
+                <div class="preview__catrow">
+                  <span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span>
+                  <span class="name"></span>
+                  <span class="num">2 784,39 · 40%</span>
+                </div>
+                <div class="preview__catrow">
+                  <span class="pill pill--shared"><span class="pill__dot"></span>Shared</span>
+                  <span class="name"></span>
+                  <span class="num">1 392,20 · 20%</span>
+                </div>
+                <div class="preview__catrow">
+                  <span class="pill pill--saved"><span class="pill__dot"></span>Saved</span>
+                  <span class="name"></span>
+                  <span class="num">1 392,20 · 20%</span>
+                </div>
+                <div class="preview__catrow">
+                  <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+                  <span class="name"></span>
+                  <span class="num">1 392,20 · 20%</span>
+                </div>
+              </div>
+            </div>
+            <div class="preview__row">
+              <div class="preview__card">
+                <div class="lbl">Buffer top-up</div>
+                <div class="big" style="color:var(--warning);">+ 412,00<span style="font-size:13px;color:var(--muted);font-weight:500;"> PLN</span></div>
+                <div class="small">to reach minimum balance on Daily Life account</div>
+              </div>
+              <div class="preview__card">
+                <div class="lbl">Spent this month</div>
+                <div class="big" style="color:var(--expense);">2 184,50<span style="font-size:13px;color:var(--muted);font-weight:500;"> PLN</span></div>
+                <div class="small">31% of allocation, 19 days in</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="problem" id="problem">
+    <div class="container problem__grid">
+      <div>
+        <span class="eyebrow"><span class="dot">●</span> The variable-income reality</span>
+        <h2 style="margin-top:12px;">Most budget apps assume a steady paycheck. <em style="font-style: italic; color: var(--muted); font-weight: 400;">Yours doesn't.</em></h2>
+        <p>
+          When you're a freelancer or sole proprietor, every month is different. You owe VAT to one place, income tax to another, ZUS to a third — and what's left changes constantly. Then you're supposed to budget on top of that.
+        </p>
+        <p>
+          Florin starts where the chaos starts: at the gross invoice. It walks the deductions with you, hands you the real net number, and only then asks how you'd like to split it.
+        </p>
+      </div>
+      <div class="problem__quotes">
+        <div class="quote">
+          "I'd get an invoice, pay myself, and three weeks later realise I was short on ZUS again."
+          <em>— common freelance month</em>
+        </div>
+        <div class="quote">
+          "Spreadsheets work until they don't. I want something that opens, calmly, and tells me where I stand."
+          <em>— sole proprietor in Warsaw</em>
+        </div>
+        <div class="quote">
+          "I don't want my money in a SaaS dashboard. I want it on my laptop, and that's it."
+          <em>— privacy by default</em>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="features__head">
+        <span class="eyebrow"><span class="dot">●</span> Four quiet things, done well</span>
+        <h2>The whole picture, calmly arranged.</h2>
+        <p>No charts you'll never read, no streaks, no nudges. Just the four moves that actually keep variable income under control.</p>
+      </div>
+      <div class="features__grid">
+
+        <!-- Net Income Calculator -->
+        <article class="feature">
+          <span class="feature__num">01 — Income</span>
+          <h3>Net income calculator</h3>
+          <p>Enter your gross invoice and your deductions — VAT, income tax, ZUS, anything else. Florin does the math live, in mono, with full transparency.</p>
+          <div class="feature__demo">
+            <div class="calc-row"><span class="lbl">Gross invoice</span><span class="num">+ 13 000,00</span></div>
+            <div class="calc-row"><span class="lbl">VAT</span><span class="num num--expense">− 2 430,89</span></div>
+            <div class="calc-row"><span class="lbl">Income tax</span><span class="num num--expense">− 2 008,13</span></div>
+            <div class="calc-row"><span class="lbl">ZUS</span><span class="num num--expense">− 1 600,00</span></div>
+            <div class="calc-divider"></div>
+            <div class="calc-total"><span class="lbl">Net income</span><span class="num num--income">= 6 960,98 PLN</span></div>
+          </div>
+        </article>
+
+        <!-- Category Split -->
+        <article class="feature">
+          <span class="feature__num">02 — Allocation</span>
+          <h3>Category split by percentage</h3>
+          <p>Divide net income across personal categories you actually use. Default 40 / 20 / 20 / 20, but you set them. Add a one-off bonus and target a single category if you want.</p>
+          <div class="feature__demo cat-demo">
+            <div class="cat-row">
+              <span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span>
+              <span class="name"></span>
+              <span class="num">40% · 2 784,39</span>
+            </div>
+            <div class="cat-bar"><span style="width: 40%; background: var(--cat-daily);"></span></div>
+            <div class="cat-row">
+              <span class="pill pill--shared"><span class="pill__dot"></span>Shared</span>
+              <span class="name"></span>
+              <span class="num">20% · 1 392,20</span>
+            </div>
+            <div class="cat-bar"><span style="width: 20%; background: var(--cat-shared);"></span></div>
+            <div class="cat-row">
+              <span class="pill pill--saved"><span class="pill__dot"></span>Saved</span>
+              <span class="name"></span>
+              <span class="num">20% · 1 392,20</span>
+            </div>
+            <div class="cat-bar"><span style="width: 20%; background: var(--cat-saved);"></span></div>
+            <div class="cat-row">
+              <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+              <span class="name"></span>
+              <span class="num">20% · 1 392,20</span>
+            </div>
+            <div class="cat-bar"><span style="width: 20%; background: var(--cat-pleasure);"></span></div>
+          </div>
+        </article>
+
+        <!-- Expense tracking -->
+        <article class="feature">
+          <span class="feature__num">03 — Expenses</span>
+          <h3>Expense tracking with category pull</h3>
+          <p>Log expenses in seconds — date, amount, description, subcategory, funding source. Each expense draws from a category's allocation, so "remaining" stays honest.</p>
+          <div class="feature__demo">
+            <div class="exp-row">
+              <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+              <span class="desc">Nails — Beauty</span>
+              <span class="num">− 110,00</span>
+            </div>
+            <div class="exp-row">
+              <span class="pill pill--daily"><span class="pill__dot"></span>Daily</span>
+              <span class="desc">Lidl groceries</span>
+              <span class="num">− 184,32</span>
+            </div>
+            <div class="exp-row">
+              <span class="pill pill--shared"><span class="pill__dot"></span>Shared</span>
+              <span class="desc">Internet · April</span>
+              <span class="num">− 89,00</span>
+            </div>
+            <div class="exp-row">
+              <span class="pill pill--daily"><span class="pill__dot"></span>Daily</span>
+              <span class="desc">Tram pass</span>
+              <span class="num">− 50,00</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Cash flow buffer -->
+        <article class="feature">
+          <span class="feature__num">04 — Cash flow</span>
+          <h3>Cash-flow buffer &amp; top-up</h3>
+          <p>Set the minimum each account should hold. After your paycheck lands, Florin tells you exactly how much to top up — and what's truly left for savings.</p>
+          <div class="feature__demo">
+            <div class="buf-row">
+              <span class="name">Daily life</span>
+              <div class="buf-bar bar"><span class="bar__fill" style="width: 78%; background: var(--cat-daily);"></span></div>
+              <span class="num num--warning">+ 412,00</span>
+            </div>
+            <div class="buf-row">
+              <span class="name">Pleasure</span>
+              <div class="buf-bar bar"><span class="bar__fill" style="width: 100%; background: var(--success);"></span></div>
+              <span class="num num--positive">✓ funded</span>
+            </div>
+            <div class="buf-row">
+              <span class="name">Business expenses</span>
+              <div class="buf-bar bar"><span class="bar__fill" style="width: 92%; background: var(--cat-business);"></span></div>
+              <span class="num num--warning">+ 220,00</span>
+            </div>
+            <div class="calc-divider"></div>
+            <div class="calc-total"><span class="lbl">Free for savings</span><span class="num num--income">= 1 740,98 PLN</span></div>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="privacy" id="privacy">
+    <div class="container privacy__inner">
+      <div>
+        <span class="eyebrow"><span class="dot">●</span> Privacy by architecture</span>
+        <h2 style="margin-top:12px;">Your money stays on your machine.</h2>
+        <p>
+          Florin is a single SQLite file on your laptop. There's no account to create, no server to log into, no cloud backup we secretly have. If you delete the app, your data is gone — and so is anyone else's chance of seeing it.
+        </p>
+        <div class="privacy__list">
+          <div class="privacy__item">
+            <div class="ico">●</div>
+            <div>
+              <h4>Local-only by default</h4>
+              <p>One file: <code style="font-family: var(--font-mono); font-size: 13px; color: var(--accent);">~/Library/Application Support/Florin/florin.db</code> on macOS, the Windows equivalent on Windows.</p>
+            </div>
+          </div>
+          <div class="privacy__item">
+            <div class="ico">●</div>
+            <div>
+              <h4>No telemetry, no tracking</h4>
+              <p>Florin doesn't phone home. The app makes no network calls — you can verify this in Activity Monitor or with Little Snitch.</p>
+            </div>
+          </div>
+          <div class="privacy__item">
+            <div class="ico">●</div>
+            <div>
+              <h4>Backup is your choice</h4>
+              <p>Copy the .db file to a USB drive, your own iCloud, or whatever you trust. Florin will not pick a cloud provider for you.</p>
+            </div>
+          </div>
+          <div class="privacy__item">
+            <div class="ico">●</div>
+            <div>
+              <h4>Open source — read it yourself</h4>
+              <p>MIT-licensed Python. The whole codebase is small enough to read in an afternoon.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="privacy__visual" aria-hidden="true">
+        <div class="meta" style="margin-bottom: 10px;">~/Library/Application Support/Florin/</div>
+        <div class="privacy__file"><span><span class="pl">●</span> florin.db</span><span>248 KB</span></div>
+        <div class="privacy__file"><span><span class="pl">●</span> florin.db.backup-2026-04</span><span>240 KB</span></div>
+        <div class="privacy__file"><span><span class="pl">●</span> config.json</span><span>1 KB</span></div>
+
+        <div class="privacy__diagram">
+          <div class="privacy__node">
+            <div class="ico">💻</div>
+            Your laptop
+          </div>
+          <span class="privacy__arrow">→</span>
+          <div class="privacy__node cloud">
+            <div class="ico">☁️</div>
+            Cloud
+          </div>
+          <span class="privacy__arrow">→</span>
+          <div class="privacy__node cloud">
+            <div class="ico">🏢</div>
+            Vendor
+          </div>
+        </div>
+        <p style="font-size: 12px; color: var(--muted); margin-top: 12px; text-align: center;">No path past the first node. Ever.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Strip: bilingual / open source / made for one person -->
+  <section class="strip">
+    <div class="container strip__grid">
+      <div class="strip__card">
+        <span class="eyebrow"><span class="dot">●</span> Languages</span>
+        <h4>Polski &amp; English, side by side.</h4>
+        <p>Florin is fully bilingual. Switch in Settings — the entire UI swaps over, including category names you've defined.</p>
+        <div class="meta">PL · EN</div>
+      </div>
+      <div class="strip__card">
+        <span class="eyebrow"><span class="dot">●</span> Built quietly</span>
+        <h4>Python · customtkinter · SQLite.</h4>
+        <p>About 4&nbsp;000 lines of readable Python. No Electron, no React Native, no shipping you a browser to balance a budget.</p>
+        <div class="meta">~40 MB · macOS &amp; Windows</div>
+      </div>
+      <div class="strip__card">
+        <span class="eyebrow"><span class="dot">●</span> Made for one person</span>
+        <h4>One user, one machine, one ledger.</h4>
+        <p>Florin doesn't pretend to be a household-finance product. If your partner wants Florin, they get their own private copy on their machine.</p>
+        <div class="meta">Single-user by design</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta" id="download">
+    <div class="container">
+      <div class="cta__inner">
+        <span class="eyebrow"><span class="dot">●</span> Free · MIT-licensed · Local-first</span>
+        <h2 style="margin-top: 12px;">Stop reconciling. Start <em style="color: var(--accent); font-style: italic; font-weight: 500;">rising above.</em></h2>
+        <p>Download the latest build, drop it in Applications, and open it. Your first month takes about ten minutes to set up. Every month after takes about two.</p>
+        <div class="cta__row">
+          <a class="btn btn--primary btn--lg" href="#">Download for macOS</a>
+          <a class="btn btn--secondary btn--lg" href="#">Download for Windows</a>
+          <a class="btn btn--ghost btn--lg" href="#">Run from source ↗</a>
+        </div>
+        <div class="cta__platforms">
+          <span>macOS 12+ · Apple Silicon &amp; Intel</span>
+          <span>Windows 10 / 11</span>
+          <span>Python 3.10+ from source</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer__inner">
+    <div class="footer__left">
+      <img src="assets/logo.png" alt="" />
+      <span><strong style="color: var(--fg); font-family: var(--font-display); font-weight: 600; font-size: 16px;">Florin</strong> — rise above your finances. © 2026.</span>
+    </div>
+    <nav class="footer__links">
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="brand-spec.md">Brand</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

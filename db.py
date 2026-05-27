@@ -122,6 +122,16 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_expenses_month ON expenses(month);
 CREATE INDEX IF NOT EXISTS idx_expenses_savings_cat ON expenses(savings_category_id);
 
+-- Explicit user snapshots of a month. These are immutable JSON payloads that
+-- support "Save snapshot" without changing the live monthly records.
+CREATE TABLE IF NOT EXISTS snapshots (
+    id TEXT PRIMARY KEY,
+    month TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_snapshots_month ON snapshots(month);
+
 -- Cashflow data (per month, per account)
 CREATE TABLE IF NOT EXISTS cashflow (
     month TEXT NOT NULL,

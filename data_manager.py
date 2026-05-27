@@ -7,6 +7,7 @@ import msoffcrypto
 import openpyxl
 import io
 from db import get_connection
+from theme import CATEGORY_COLORS, COLOR_TEXT_FAINT
 
 DATA_DIR = Path("data")
 CONFIG_FILE = Path("config.json")
@@ -159,6 +160,37 @@ def get_past_months(current_month):
     return [r[0] for r in rows]
 
 
+def save_snapshot(month_str, data):
+    """Persist an immutable JSON snapshot of a month and return its metadata."""
+    conn = get_connection()
+    snapshot_id = generate_id()
+    payload = json.dumps(data, ensure_ascii=False, sort_keys=True)
+    conn.execute(
+        "INSERT INTO snapshots (id, month, payload) VALUES (?, ?, ?)",
+        (snapshot_id, month_str, payload)
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, month, created_at FROM snapshots WHERE id = ?",
+        (snapshot_id,)
+    ).fetchone()
+    return {"id": row["id"], "month": row["month"], "created_at": row["created_at"]}
+
+
+def get_snapshots(month_str=None):
+    conn = get_connection()
+    if month_str:
+        rows = conn.execute(
+            "SELECT id, month, created_at FROM snapshots WHERE month = ? ORDER BY created_at DESC",
+            (month_str,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, month, created_at FROM snapshots ORDER BY created_at DESC"
+        ).fetchall()
+    return [{"id": r["id"], "month": r["month"], "created_at": r["created_at"]} for r in rows]
+
+
 
 DEFAULT_EXPENSE_CATEGORIES = [
     {"id": "groceries", "name": "Groceries"},
@@ -232,7 +264,7 @@ def save_month(month_str, data):
     for cat in data.get("categories", []):
         conn.execute(
             "INSERT INTO categories (id, month, name, percent, color) VALUES (?, ?, ?, ?, ?)",
-            (cat["id"], month_str, cat["name"], cat.get("percent", 0), cat.get("color", "#888888"))
+            (cat["id"], month_str, cat["name"], cat.get("percent", 0), cat.get("color", CATEGORY_COLORS.get(cat["id"], COLOR_TEXT_FAINT)))
         )
 
     # Expense categories
@@ -312,10 +344,10 @@ def generate_default_month(month_str):
 
 def _default_categories():
     return [
-        {"id": "daily_life", "name": "Daily Life", "percent": 40, "color": "#C9A86B"},
-        {"id": "shared", "name": "Shared", "percent": 20, "color": "#6B98C9"},
-        {"id": "saved", "name": "Saved", "percent": 20, "color": "#6BAD8A"},
-        {"id": "pleasure", "name": "Pleasure", "percent": 20, "color": "#C96B98"},
+        {"id": "daily_life", "name": "Daily Life", "percent": 40, "color": CATEGORY_COLORS["daily_life"]},
+        {"id": "shared", "name": "Shared", "percent": 20, "color": CATEGORY_COLORS["shared"]},
+        {"id": "saved", "name": "Saved", "percent": 20, "color": CATEGORY_COLORS["saved"]},
+        {"id": "pleasure", "name": "Pleasure", "percent": 20, "color": CATEGORY_COLORS["pleasure"]},
     ]
 
 

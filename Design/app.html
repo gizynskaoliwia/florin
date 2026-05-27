@@ -1,0 +1,2603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Florin — Desktop App</title>
+<link rel="icon" href="assets/logo.png" />
+<link rel="stylesheet" href="assets/florin.css" />
+<style>
+  /* =====================================================================
+     APP-WIDE LAYOUT
+     ===================================================================== */
+  .screen { display: none; flex-direction: column; min-height: 0; flex: 1; }
+  .screen.is-active { display: flex; }
+
+  /* When onboarding is active, hide the sidebar and let main span full width */
+  .app-window__body.onboarding-mode { grid-template-columns: 1fr; }
+  .app-window__body.onboarding-mode > .sidebar { display: none; }
+
+  /* Sidebar footer: layout for "first-run" link */
+  .sidebar__foot { justify-content: space-between; }
+  .sidebar__foot .first-run { color: var(--accent); font-size: 11px; font-weight: 600; text-decoration: none; }
+  .sidebar__foot .first-run:hover { text-decoration: underline; }
+
+  /* =====================================================================
+     DASHBOARD
+     ===================================================================== */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+  }
+  .dash-grid--bottom {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 16px;
+  }
+  .hero-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 28px 28px 24px;
+    display: flex; flex-direction: column; gap: 18px;
+    min-height: 260px;
+  }
+  .hero-card__head { display: flex; align-items: baseline; justify-content: space-between; }
+  .hero-card__amount {
+    font-family: var(--font-mono);
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--income);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 4px 0 6px;
+  }
+  .hero-card__amount .unit { font-size: 18px; color: var(--muted); margin-left: 8px; font-weight: 500; }
+  .hero-card__sub { color: var(--muted); font-size: 13px; }
+  .hero-card__breakdown {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    border-top: 1px dashed var(--border);
+    padding-top: 16px;
+  }
+  .br-item .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
+  .br-item .num { font-size: 16px; font-weight: 600; }
+
+  .donut-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 24px;
+    display: flex; gap: 24px;
+    align-items: center;
+    min-height: 260px;
+  }
+  .donut-card .donut {
+    flex: 0 0 180px;
+    background: conic-gradient(
+      var(--cat-daily)    0%   40%,
+      var(--cat-shared)  40%   60%,
+      var(--cat-saved)   60%   80%,
+      var(--cat-pleasure) 80% 100%
+    );
+  }
+  .donut-card .donut__center .num { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--fg); letter-spacing: -0.01em; }
+  .donut-card .donut__center .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 700; margin-top: 2px; }
+  .legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .legend__row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .legend__sw { width: 10px; height: 10px; border-radius: 3px; }
+  .legend__name { flex: 1; font-weight: 700; font-size: 13px; }
+  .legend__pct { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .legend__num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; min-width: 90px; text-align: right; }
+
+  .alloc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 24px;
+  }
+  .alloc__row { display: grid; grid-template-columns: 140px 1fr 130px; gap: 12px; align-items: center; padding: 10px 0; }
+  .alloc__row + .alloc__row { border-top: 1px dashed var(--border); }
+  .alloc__bar { display: flex; flex-direction: column; gap: 4px; }
+  .alloc__bar .meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .alloc__bar .progress { height: 6px; }
+  .alloc__remain { text-align: right; font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+
+  .recent-list {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 0;
+    overflow: hidden;
+  }
+  .recent-list__head { padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .recent-list__head h4 { margin: 0; font-size: 15px; font-weight: 700; }
+  .recent-row {
+    display: grid;
+    grid-template-columns: 70px 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 24px;
+  }
+  .recent-row + .recent-row { border-top: 1px solid var(--border); }
+  .recent-row .date { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .recent-row .desc { display: flex; flex-direction: column; gap: 2px; }
+  .recent-row .desc strong { font-size: 14px; font-weight: 700; color: var(--fg); }
+  .recent-row .desc small { font-size: 12px; color: var(--muted); }
+  .recent-row .amt { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--expense); }
+  .recent-list__foot { padding: 14px 24px; border-top: 1px solid var(--border); text-align: center; }
+  .recent-list__foot a { font-size: 13px; }
+
+  .buffer {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 24px;
+  }
+  .buffer__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .buffer__head h4 { margin: 0; font-size: 15px; font-weight: 700; }
+  .buffer__total {
+    background: linear-gradient(180deg, oklch(67% 0.09 155 / 0.10), oklch(67% 0.09 155 / 0.04));
+    border: 1px solid oklch(67% 0.09 155 / 0.30);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .buffer__total .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: var(--muted); }
+  .buffer__total .num { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--income); }
+  .buffer__row { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; padding: 10px 0; border-top: 1px dashed var(--border); }
+  .buffer__row:first-of-type { border-top: 0; }
+  .buffer__row .name { font-weight: 600; font-size: 13px; }
+  .buffer__row .amt { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+  .buffer__row .progress-row { grid-column: 1 / -1; }
+
+  .qstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .qstat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 16px 18px;
+  }
+  .qstat .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+  .qstat .num { font-family: var(--font-mono); font-size: 22px; font-weight: 700; }
+  .qstat .delta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* =====================================================================
+     EXPENSES
+     ===================================================================== */
+  .exp-page {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+    align-items: start;
+    flex: 1;
+    min-height: 0;
+  }
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 14px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .filter-bar .search { flex: 1; min-width: 200px; }
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill--filter { cursor: pointer; }
+  .pill--filter.is-active { box-shadow: inset 0 0 0 2px currentColor; }
+
+  .list-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+  .list-summary {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, oklch(63% 0.13 348 / 0.03), transparent);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .list-summary .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
+  .list-summary .num { font-family: var(--font-mono); font-size: 18px; font-weight: 700; }
+
+  .day-header {
+    padding: 12px 20px 6px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+  .day-header:first-child { border-top: 0; }
+  .day-header .date {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+  .day-header .total { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+  .exp-item {
+    display: grid;
+    grid-template-columns: 28px 1fr auto auto;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 20px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 120ms ease;
+  }
+  .exp-item + .exp-item { border-top: 1px solid var(--border); }
+  .exp-item:hover { background: var(--surface-2); }
+  .exp-item.is-selected {
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
+  .exp-item .ico {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+    font-size: 14px;
+    border: 1px solid var(--border);
+  }
+  .exp-item .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .exp-item .info strong { font-size: 14px; font-weight: 700; color: var(--fg); }
+  .exp-item .info small { font-size: 12px; color: var(--muted); }
+  .exp-item .info .tags { display: flex; gap: 4px; margin-top: 4px; }
+  .exp-item .amt { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--expense); }
+
+  .detail-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    position: sticky;
+    top: 16px;
+  }
+  .detail-card__head {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, oklch(63% 0.13 348 / 0.06), transparent);
+  }
+  .detail-card__head .row { gap: 12px; }
+  .detail-card__title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .detail-card__amount {
+    font-family: var(--font-mono);
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--expense);
+    letter-spacing: -0.02em;
+    margin-top: 6px;
+  }
+  .detail-card__amount .unit { font-size: 14px; color: var(--muted); margin-left: 6px; font-weight: 500; }
+
+  .detail-card__body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; flex: 1; overflow-y: auto; }
+  .field-row { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .field-row:last-child { border-bottom: 0; }
+  .field-row .label { margin: 0; }
+  .field-row .input, .field-row .select { background: transparent; border: 1px solid transparent; height: 32px; font-size: 13px; padding: 0 8px; border-radius: 6px; }
+  .field-row .input:hover, .field-row .select:hover { background: var(--surface-2); border-color: var(--border); }
+  .field-row .input:focus { background: var(--surface); border-color: var(--accent); }
+
+  .detail-card__foot {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: space-between; align-items: center;
+    background: var(--surface-2);
+  }
+  .breakdown {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-top: 4px;
+  }
+  .breakdown .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+  .breakdown .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+  .breakdown .row .num { font-family: var(--font-mono); font-size: 13px; }
+
+  /* =====================================================================
+     ONBOARDING
+     ===================================================================== */
+  .onboard {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    background: var(--bg);
+  }
+  .onboard__rail {
+    background: linear-gradient(180deg, oklch(96% 0.025 350), oklch(94% 0.04 340));
+    border-right: 1px solid var(--border);
+    padding: 32px 28px;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .onboard__brand { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+  .onboard__brand img { width: 44px; height: 44px; border-radius: 50%; }
+  .onboard__brand .name { font-family: var(--font-display); font-size: 24px; font-weight: 600; }
+  .onboard__caption { color: var(--muted); font-size: 14px; line-height: 1.55; margin-bottom: 28px; }
+
+  .step-list { list-style: none; padding: 0; margin: 0 0 32px; display: flex; flex-direction: column; gap: 4px; }
+  .step-list li {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 14px;
+    padding: 12px 12px 12px 8px;
+    border-radius: 10px;
+    align-items: flex-start;
+    position: relative;
+    cursor: pointer;
+  }
+  .step-list li.is-done { color: var(--muted); }
+  .step-list li.is-active { background: var(--surface); border: 1px solid var(--border); }
+  .step-list li.is-pending { color: var(--faint); }
+  .step-list li::before {
+    content: ""; position: absolute; left: 22px; top: 36px; bottom: -4px;
+    width: 2px; background: var(--border);
+  }
+  .step-list li:last-child::before { display: none; }
+  .step-list li.is-done::before { background: var(--success); }
+
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-list li.is-active .step-num { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .step-list li.is-done .step-num { background: var(--success); color: #fff; border-color: var(--success); }
+  .step-list .step-title { font-weight: 700; font-size: 14px; color: inherit; }
+  .step-list li.is-active .step-title { color: var(--fg); }
+  .step-list .step-desc { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+
+  .rail-quote {
+    margin-top: auto;
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .rail-quote strong { color: var(--fg); display: block; font-family: var(--font-display); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+
+  .onboard__main {
+    padding: 40px 56px 24px;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .onboard__head { margin-bottom: 28px; max-width: 640px; }
+  .onboard__head .eyebrow { display: inline-block; margin-bottom: 12px; }
+  .onboard__head h1 {
+    font-size: 36px;
+    line-height: 1.15;
+    margin-bottom: 10px;
+  }
+  .onboard__head h1 em { font-style: italic; color: var(--accent); font-weight: 500; }
+  .onboard__head p { font-size: 15px; color: var(--muted); margin: 0; max-width: 540px; }
+
+  .cat-edit {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 24px 24px 16px;
+    margin-bottom: 16px;
+  }
+  .cat-edit__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cat-edit__head h3 { font-family: var(--font-body); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .cat-edit__head .net-pill {
+    background: oklch(60% 0.07 175 / 0.10);
+    color: var(--income);
+    border: 1px solid oklch(60% 0.07 175 / 0.30);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .cat-row-edit {
+    display: grid;
+    grid-template-columns: 28px 1fr 1fr 90px 110px 28px;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .cat-row-edit:last-of-type { border-bottom: 0; }
+  .cat-row-edit .swatch {
+    width: 28px; height: 28px; border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .cat-row-edit .swatch:hover { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+  .cat-row-edit .name-input {
+    border: 0;
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fg);
+    padding: 4px 0;
+  }
+  .cat-row-edit .name-input:focus { outline: none; border-bottom: 1px solid var(--accent); }
+
+  .slider-cell { display: flex; flex-direction: column; gap: 4px; }
+  .slider {
+    appearance: none; -webkit-appearance: none;
+    width: 100%; height: 6px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--accent);
+    box-shadow: 0 1px 3px oklch(20% 0.02 340 / 0.15);
+    cursor: pointer;
+  }
+  .slider::-moz-range-thumb {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--accent);
+    cursor: pointer;
+  }
+  .slider-cell .ticks { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--faint); }
+
+  .pct-input { text-align: right; font-family: var(--font-mono); font-size: 14px; font-weight: 700; }
+  .amt-cell { text-align: right; font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--income); }
+  .row-action {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 0; background: transparent;
+    color: var(--faint); cursor: pointer;
+    font-size: 14px;
+  }
+  .row-action:hover { background: var(--surface-2); color: var(--error); }
+
+  .cat-edit__add {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px dashed var(--border);
+    border-radius: var(--r-btn);
+    color: var(--muted);
+    background: transparent;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .cat-edit__add:hover { border-color: var(--accent); color: var(--accent); }
+
+  .total-row {
+    display: grid;
+    grid-template-columns: 28px 1fr 1fr 90px 110px 28px;
+    gap: 14px;
+    padding: 12px 0 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+    font-weight: 700;
+    align-items: center;
+  }
+  .total-row .lbl { grid-column: 2 / 4; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .total-row .pct { text-align: right; font-family: var(--font-mono); font-size: 14px; color: var(--success); }
+  .total-row .amt { text-align: right; font-family: var(--font-mono); font-size: 14px; color: var(--fg); }
+
+  .onboard__foot {
+    margin-top: auto;
+    padding-top: 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid var(--border);
+  }
+  .onboard__foot .progress-text { font-family: var(--font-mono); font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+  .onboard__foot .actions { display: flex; gap: 8px; }
+
+  /* =====================================================================
+     SETTINGS
+     ===================================================================== */
+  .settings-page {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 24px;
+    padding: 24px;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .settings-nav {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 2px;
+    position: sticky;
+    top: 0;
+  }
+  .settings-nav li a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px; font-weight: 600;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .settings-nav li a:hover { background: var(--surface); color: var(--fg); text-decoration: none; }
+  .settings-nav li a.is-active { background: var(--surface); color: var(--accent); border: 1px solid var(--border); }
+
+  .settings-body {
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex; flex-direction: column;
+    gap: 24px;
+  }
+  .settings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+  }
+  .settings-section__head {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-section__head h3 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .settings-section__head p {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0;
+    max-width: 600px;
+  }
+  .settings-section__body { padding: 16px 24px 24px; }
+
+  .row-item {
+    display: grid;
+    grid-template-columns: 28px 1fr 100px auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .row-item:last-child { border-bottom: 0; }
+  .row-item .ico {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 14px;
+    border: 1px solid var(--border);
+  }
+  .row-item .name { font-size: 14px; font-weight: 700; }
+  .row-item .name small { display: block; font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 2px; }
+  .row-item .pct, .row-item .amt-val {
+    text-align: right;
+    font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  }
+  .row-item .amt-val { color: var(--income); }
+
+  .add-row-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+    border: 1px dashed var(--border);
+    border-radius: var(--r-btn);
+    background: transparent;
+    color: var(--muted);
+    font-weight: 600; font-size: 13px;
+    cursor: pointer;
+  }
+  .add-row-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  .cat-mini {
+    display: grid;
+    grid-template-columns: 28px 1fr 80px auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .cat-mini:last-child { border-bottom: 0; }
+  .cat-mini .swatch { width: 24px; height: 24px; border-radius: 6px; box-shadow: 0 0 0 1px var(--border); }
+  .cat-mini .name { font-weight: 700; font-size: 14px; }
+  .cat-mini .pct { text-align: right; font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+  .cat-mini .actions { display: flex; gap: 4px; }
+
+  .theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .theme-card {
+    border: 2px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 14px;
+    cursor: pointer;
+    transition: border-color 120ms ease;
+    background: var(--surface);
+  }
+  .theme-card.is-active { border-color: var(--accent); }
+  .theme-card .preview {
+    height: 100px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    display: grid;
+    grid-template-rows: 22px 1fr;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .theme-card .preview .head { background: oklch(96% 0.018 350); border-bottom: 1px solid var(--border); }
+  .theme-card .preview .body { display: grid; grid-template-columns: 30% 1fr; }
+  .theme-card .preview .body .side { background: var(--surface); border-right: 1px solid var(--border); }
+  .theme-card .preview .body .main {
+    background: var(--bg);
+    padding: 8px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .theme-card .preview .body .main .strip { height: 6px; border-radius: 3px; background: var(--surface); border: 1px solid var(--border); }
+  .theme-card .preview .body .main .strip.accent { background: var(--accent); width: 50%; border-color: var(--accent); }
+  .theme-card.dark .preview .head { background: oklch(28% 0.025 340); }
+  .theme-card.dark .preview .body .side { background: oklch(26% 0.025 340); border-right-color: oklch(38% 0.04 340); }
+  .theme-card.dark .preview .body .main { background: oklch(20% 0.02 340); }
+  .theme-card.dark .preview .body .main .strip { background: oklch(28% 0.025 340); border-color: oklch(38% 0.04 340); }
+  .theme-card .lbl { display: flex; align-items: center; justify-content: space-between; }
+  .theme-card .lbl strong { font-size: 14px; font-weight: 700; }
+  .theme-card .lbl span { font-size: 11px; color: var(--muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .lang-row { display: flex; gap: 10px; }
+  .lang-card {
+    flex: 1;
+    border: 2px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 14px 18px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface);
+  }
+  .lang-card.is-active { border-color: var(--accent); }
+  .lang-card .flag {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .lang-card strong { display: block; font-size: 15px; font-weight: 700; }
+  .lang-card small { display: block; font-size: 12px; color: var(--muted); }
+
+  .data-list { display: flex; flex-direction: column; gap: 12px; }
+  .data-row {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    gap: 16px;
+  }
+  .data-row .info strong { display: block; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .data-row .info p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .data-row .info code { font-family: var(--font-mono); font-size: 12px; color: var(--accent); background: var(--surface); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
+  .data-row .actions { flex-shrink: 0; }
+  .danger {
+    border-color: oklch(60% 0.16 18 / 0.3) !important;
+    background: oklch(60% 0.16 18 / 0.05) !important;
+  }
+
+  /* =====================================================================
+     STUB SCREEN (for non-implemented sidebar items)
+     ===================================================================== */
+  .stub {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+  }
+  .stub__inner {
+    max-width: 480px;
+    text-align: center;
+  }
+  .stub__inner .ico {
+    width: 64px; height: 64px;
+    margin: 0 auto 18px;
+    border-radius: 18px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+  }
+  .stub__inner h2 { font-family: var(--font-display); font-size: 32px; font-weight: 600; margin-bottom: 10px; }
+  .stub__inner p { color: var(--muted); font-size: 15px; margin-bottom: 18px; }
+  .stub__inner .meta { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+</style>
+</head>
+<body class="app-shell-host">
+
+<div class="app-shell-host__caption">
+  <span class="eyebrow"><span class="dot">●</span> Florin · Desktop App · 1200 × 800</span>
+  <h2 id="screen-caption">Dashboard</h2>
+</div>
+
+<div class="app-window">
+  <div class="app-window__chrome">
+    <div class="app-window__lights"><span></span><span></span><span></span></div>
+    <div class="app-window__title" id="window-title">Florin — April 2026</div>
+  </div>
+
+  <div class="app-window__body" id="app-body">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <img src="assets/logo.png" alt="Florin logo" />
+        <span class="sidebar__brand-name">Florin</span>
+      </div>
+      <ul class="sidebar__nav">
+        <li><a href="#" data-screen="dashboard" class="is-active"><span class="ico">✦</span>Dashboard</a></li>
+        <li><a href="#" data-screen="income"><span class="ico">💰</span>Income</a></li>
+        <li><a href="#" data-screen="expenses"><span class="ico">🧾</span>Expenses</a></li>
+        <li><a href="#" data-screen="savings"><span class="ico">🌱</span>Savings</a></li>
+        <li><a href="#" data-screen="cashflow"><span class="ico">💧</span>Cash flow</a></li>
+        <li><a href="#" data-screen="history"><span class="ico">📅</span>History</a></li>
+        <li style="margin-top: auto;"><a href="#" data-screen="settings"><span class="ico">⚙️</span>Settings</a></li>
+      </ul>
+      <div class="sidebar__foot">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span class="dot"></span>
+          <span>Data saved locally</span>
+        </span>
+        <a href="#" data-screen="onboarding" class="first-run">First-run ↗</a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <section class="main">
+
+      <!-- ================================================================
+           SCREEN: DASHBOARD
+           ================================================================ -->
+      <div class="screen is-active" data-screen-content="dashboard">
+        <header class="topbar">
+          <h1>Dashboard</h1>
+          <div class="grow"></div>
+          <div class="month-switcher">
+            <button aria-label="Previous month">‹</button>
+            <span class="label">April 2026</span>
+            <button aria-label="Next month">›</button>
+          </div>
+          <button class="btn btn--secondary btn--sm">Save snapshot</button>
+          <button class="btn btn--primary btn--sm">＋ Add expense</button>
+        </header>
+
+        <div class="content">
+          <!-- Hero + donut -->
+          <div class="dash-grid">
+            <div class="hero-card">
+              <div class="hero-card__head">
+                <div>
+                  <span class="eyebrow"><span class="dot">●</span> Net income · April</span>
+                  <div class="hero-card__amount">6 960,98<span class="unit">PLN</span></div>
+                  <div class="hero-card__sub">From a single 13 000,00 invoice, after VAT, income tax and ZUS.</div>
+                </div>
+                <button class="btn btn--ghost btn--sm">Edit income</button>
+              </div>
+              <div class="hero-card__breakdown">
+                <div class="br-item"><div class="lbl">Gross</div><div class="num num--neutral">13 000,00</div></div>
+                <div class="br-item"><div class="lbl">VAT</div><div class="num num--expense">− 2 430,89</div></div>
+                <div class="br-item"><div class="lbl">Income tax</div><div class="num num--expense">− 2 008,13</div></div>
+                <div class="br-item"><div class="lbl">ZUS</div><div class="num num--expense">− 1 600,00</div></div>
+              </div>
+            </div>
+
+            <div class="donut-card">
+              <div class="donut">
+                <div class="donut__center">
+                  <div class="num">100%</div>
+                  <div class="lbl">Allocated</div>
+                </div>
+              </div>
+              <div class="legend">
+                <div class="legend__row"><span class="legend__sw" style="background: var(--cat-daily);"></span><span class="legend__name">Daily life</span><span class="legend__pct">40%</span><span class="legend__num">2 784,39</span></div>
+                <div class="legend__row"><span class="legend__sw" style="background: var(--cat-shared);"></span><span class="legend__name">Shared</span><span class="legend__pct">20%</span><span class="legend__num">1 392,20</span></div>
+                <div class="legend__row"><span class="legend__sw" style="background: var(--cat-saved);"></span><span class="legend__name">Saved</span><span class="legend__pct">20%</span><span class="legend__num">1 392,20</span></div>
+                <div class="legend__row"><span class="legend__sw" style="background: var(--cat-pleasure);"></span><span class="legend__name">Pleasure</span><span class="legend__pct">20%</span><span class="legend__num">1 392,20</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick stats -->
+          <div class="qstats">
+            <div class="qstat"><div class="lbl">Spent · April</div><div class="num num--expense">2 184,50</div><div class="delta">31% of allocation · 19 days in</div></div>
+            <div class="qstat"><div class="lbl">Remaining</div><div class="num num--positive">4 776,48</div><div class="delta">across 4 categories</div></div>
+            <div class="qstat"><div class="lbl">Free for savings</div><div class="num num--neutral">1 740,98</div><div class="delta">after buffer top-ups</div></div>
+          </div>
+
+          <!-- Allocation + buffer -->
+          <div class="dash-grid--bottom">
+            <div class="alloc">
+              <div class="row row--between" style="margin-bottom: 14px;">
+                <h4 style="margin: 0; font-size: 15px;">Spending by category</h4>
+                <span class="meta">Allocated · Spent · Remaining</span>
+              </div>
+              <div class="alloc__row">
+                <span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span>
+                <div class="alloc__bar">
+                  <div class="meta"><span>1 042,18 spent</span><span>of 2 784,39</span></div>
+                  <div class="progress progress--daily"><div class="progress__fill" style="width: 37%;"></div></div>
+                </div>
+                <div class="alloc__remain num--positive">+ 1 742,21</div>
+              </div>
+              <div class="alloc__row">
+                <span class="pill pill--shared"><span class="pill__dot"></span>Shared</span>
+                <div class="alloc__bar">
+                  <div class="meta"><span>289,00 spent</span><span>of 1 392,20</span></div>
+                  <div class="progress progress--shared"><div class="progress__fill" style="width: 21%;"></div></div>
+                </div>
+                <div class="alloc__remain num--positive">+ 1 103,20</div>
+              </div>
+              <div class="alloc__row">
+                <span class="pill pill--saved"><span class="pill__dot"></span>Saved</span>
+                <div class="alloc__bar">
+                  <div class="meta"><span>0,00 spent</span><span>of 1 392,20</span></div>
+                  <div class="progress progress--saved"><div class="progress__fill" style="width: 0%;"></div></div>
+                </div>
+                <div class="alloc__remain num--positive">+ 1 392,20</div>
+              </div>
+              <div class="alloc__row">
+                <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+                <div class="alloc__bar">
+                  <div class="meta"><span>853,32 spent</span><span>of 1 392,20</span></div>
+                  <div class="progress progress--pleasure"><div class="progress__fill" style="width: 61%;"></div></div>
+                </div>
+                <div class="alloc__remain num--warning">+ 538,88</div>
+              </div>
+            </div>
+
+            <div class="buffer">
+              <div class="buffer__head">
+                <h4>Cash-flow buffer</h4>
+                <a href="#" class="meta">Adjust →</a>
+              </div>
+              <div class="buffer__total">
+                <div>
+                  <div class="lbl">Free for savings</div>
+                  <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">After all top-ups</div>
+                </div>
+                <div class="num">1 740,98</div>
+              </div>
+              <div class="buffer__row">
+                <span class="name">Daily life · mBank</span>
+                <span class="amt num--warning">+ 412,00</span>
+                <div class="progress-row"><div class="progress progress--warn"><div class="progress__fill" style="width: 78%;"></div></div></div>
+              </div>
+              <div class="buffer__row">
+                <span class="name">Pleasure · Revolut</span>
+                <span class="amt num--positive">✓ funded</span>
+                <div class="progress-row"><div class="progress progress--income"><div class="progress__fill" style="width: 100%;"></div></div></div>
+              </div>
+              <div class="buffer__row">
+                <span class="name">Business · ING</span>
+                <span class="amt num--warning">+ 220,00</span>
+                <div class="progress-row"><div class="progress progress--warn"><div class="progress__fill" style="width: 92%;"></div></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent expenses -->
+          <div class="recent-list">
+            <div class="recent-list__head">
+              <h4>Recent expenses · April</h4>
+              <a href="#" data-screen="expenses" class="meta">View all 14 →</a>
+            </div>
+            <div class="recent-row"><span class="date">10 Apr</span><div class="desc"><strong>Nails</strong><small>Beauty</small></div><span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span><span class="amt">− 110,00</span></div>
+            <div class="recent-row"><span class="date">09 Apr</span><div class="desc"><strong>Lidl</strong><small>Groceries</small></div><span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span><span class="amt">− 184,32</span></div>
+            <div class="recent-row"><span class="date">07 Apr</span><div class="desc"><strong>Internet · Orange</strong><small>Bills</small></div><span class="pill pill--shared"><span class="pill__dot"></span>Shared</span><span class="amt">− 89,00</span></div>
+            <div class="recent-row"><span class="date">06 Apr</span><div class="desc"><strong>Tram pass</strong><small>Transport</small></div><span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span><span class="amt">− 50,00</span></div>
+            <div class="recent-row"><span class="date">04 Apr</span><div class="desc"><strong>Coffee &amp; pastry · Etno</strong><small>Eating out</small></div><span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span><span class="amt">− 28,50</span></div>
+            <div class="recent-list__foot">
+              <a href="#" data-screen="expenses">View all expenses →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SCREEN: EXPENSES
+           ================================================================ -->
+      <div class="screen" data-screen-content="expenses">
+        <header class="topbar">
+          <h1>Expenses</h1>
+          <div class="grow"></div>
+          <div class="month-switcher">
+            <button aria-label="Previous month">‹</button>
+            <span class="label">April 2026</span>
+            <button aria-label="Next month">›</button>
+          </div>
+          <button class="btn btn--secondary btn--sm">Manage categories</button>
+          <button class="btn btn--primary btn--sm">＋ Add expense</button>
+        </header>
+
+        <div class="content" style="overflow: hidden;">
+          <div class="filter-bar">
+            <div class="search" style="flex: 1.4;">
+              <input class="input" type="search" placeholder="Search description, tag, or amount…" />
+            </div>
+            <div class="pill-row">
+              <span class="pill pill--neutral pill--filter is-active">All · 14</span>
+              <span class="pill pill--daily pill--filter"><span class="pill__dot"></span>Daily life · 6</span>
+              <span class="pill pill--shared pill--filter"><span class="pill__dot"></span>Shared · 2</span>
+              <span class="pill pill--saved pill--filter"><span class="pill__dot"></span>Saved · 0</span>
+              <span class="pill pill--pleasure pill--filter"><span class="pill__dot"></span>Pleasure · 6</span>
+            </div>
+            <div class="segmented">
+              <button class="is-active">By date</button>
+              <button>By category</button>
+            </div>
+          </div>
+
+          <div class="exp-page">
+            <!-- LEFT: list -->
+            <div class="list-card">
+              <div class="list-summary">
+                <div><div class="lbl">Spent · April</div><div class="num num--expense">2 184,50</div></div>
+                <div><div class="lbl">Allocated</div><div class="num num--neutral">6 960,98</div></div>
+                <div><div class="lbl">Remaining</div><div class="num num--positive">4 776,48</div></div>
+              </div>
+
+              <div class="day-header"><span class="date">Fri · 10 April</span><span class="total">3 items · − 294,32</span></div>
+              <div class="exp-item is-selected">
+                <div class="ico">✨</div>
+                <div class="info">
+                  <strong>Nails</strong>
+                  <small>Beauty · Etno Studio Wola</small>
+                  <div class="tags"><span class="tag">beauty</span><span class="tag">personal</span></div>
+                </div>
+                <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+                <span class="amt">− 110,00</span>
+              </div>
+              <div class="exp-item">
+                <div class="ico">🌸</div>
+                <div class="info"><strong>Lidl groceries</strong><small>Groceries · Wola</small></div>
+                <span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span>
+                <span class="amt">− 184,32</span>
+              </div>
+
+              <div class="day-header"><span class="date">Thu · 9 April</span><span class="total">2 items · − 89,00</span></div>
+              <div class="exp-item">
+                <div class="ico">🤝</div>
+                <div class="info"><strong>Internet · Orange</strong><small>Bills · April invoice</small></div>
+                <span class="pill pill--shared"><span class="pill__dot"></span>Shared</span>
+                <span class="amt">− 89,00</span>
+              </div>
+
+              <div class="day-header"><span class="date">Tue · 7 April</span><span class="total">1 item · − 50,00</span></div>
+              <div class="exp-item">
+                <div class="ico">🌸</div>
+                <div class="info"><strong>Tram pass</strong><small>Transport · monthly</small></div>
+                <span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span>
+                <span class="amt">− 50,00</span>
+              </div>
+
+              <div class="day-header"><span class="date">Mon · 6 April</span><span class="total">2 items · − 78,50</span></div>
+              <div class="exp-item">
+                <div class="ico">✨</div>
+                <div class="info"><strong>Coffee &amp; pastry · Etno</strong><small>Eating out</small></div>
+                <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+                <span class="amt">− 28,50</span>
+              </div>
+              <div class="exp-item">
+                <div class="ico">🌸</div>
+                <div class="info"><strong>Pharmacy</strong><small>Healthcare</small></div>
+                <span class="pill pill--daily"><span class="pill__dot"></span>Daily life</span>
+                <span class="amt">− 50,00</span>
+              </div>
+
+              <div class="day-header"><span class="date">Sat · 4 April</span><span class="total">1 item · − 110,00</span></div>
+              <div class="exp-item">
+                <div class="ico">✨</div>
+                <div class="info"><strong>Cinema · Atlantic</strong><small>Entertainment</small></div>
+                <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+                <span class="amt">− 110,00</span>
+              </div>
+            </div>
+
+            <!-- RIGHT: detail -->
+            <aside class="detail-card">
+              <div class="detail-card__head">
+                <div class="row row--between">
+                  <span class="eyebrow"><span class="dot">●</span> Expense detail</span>
+                  <span class="meta">Edited · 10 Apr 18:42</span>
+                </div>
+                <div class="detail-card__title">Nails</div>
+                <div class="detail-card__amount">− 110,00<span class="unit">PLN</span></div>
+                <div class="row" style="margin-top: 8px;">
+                  <span class="pill pill--pleasure"><span class="pill__dot"></span>Pleasure</span>
+                  <span class="meta">Beauty subcategory</span>
+                </div>
+              </div>
+
+              <div class="detail-card__body">
+                <div class="field-row">
+                  <label class="label">Date</label>
+                  <input class="input input--mono" value="10/04/2026" />
+                </div>
+                <div class="field-row">
+                  <label class="label">Amount</label>
+                  <input class="input input--mono" value="110,00" />
+                </div>
+                <div class="field-row">
+                  <label class="label">Description</label>
+                  <input class="input" value="Nails" />
+                </div>
+                <div class="field-row">
+                  <label class="label">Subcategory</label>
+                  <input class="input" value="Beauty" />
+                </div>
+                <div class="field-row">
+                  <label class="label">Funding</label>
+                  <select class="select">
+                    <option>Pleasure</option>
+                    <option>Daily life</option>
+                    <option>Shared</option>
+                    <option>Saved</option>
+                    <option>— savings goal —</option>
+                  </select>
+                </div>
+                <div class="field-row">
+                  <label class="label">Tags</label>
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <span class="tag">beauty</span>
+                    <span class="tag">personal</span>
+                    <button class="btn btn--ghost btn--sm" style="height: 24px; padding: 0 8px; font-size: 11px;">＋ tag</button>
+                  </div>
+                </div>
+                <div class="field-row" style="grid-template-columns: 1fr;">
+                  <label class="label">Note</label>
+                  <textarea class="textarea" rows="2" placeholder="Optional note…">Etno Studio Wola, Anna. Tipped 10.</textarea>
+                </div>
+
+                <div class="breakdown">
+                  <div class="lbl">Impact on Pleasure budget</div>
+                  <div class="row"><span>Allocated</span><span class="num">1 392,20</span></div>
+                  <div class="row"><span>Spent so far</span><span class="num num--expense">− 853,32</span></div>
+                  <div class="row" style="border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 4px;">
+                    <span style="font-weight: 700;">Remaining</span>
+                    <span class="num num--warning" style="font-weight: 700;">+ 538,88</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-card__foot">
+                <button class="btn btn--ghost btn--sm" style="color: var(--error);">🗑 Delete</button>
+                <div class="row">
+                  <button class="btn btn--secondary btn--sm">Cancel</button>
+                  <button class="btn btn--primary btn--sm">Save changes</button>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SCREEN: SETTINGS
+           ================================================================ -->
+      <div class="screen" data-screen-content="settings">
+        <header class="topbar">
+          <h1>Settings</h1>
+          <div class="grow"></div>
+          <span class="meta">Changes save automatically</span>
+        </header>
+
+        <div class="settings-page">
+          <ul class="settings-nav">
+            <li><a href="#income" class="is-active">Default income</a></li>
+            <li><a href="#buffer">Cash-flow targets</a></li>
+            <li><a href="#categories">Categories</a></li>
+            <li><a href="#appearance">Appearance</a></li>
+            <li><a href="#language">Language</a></li>
+            <li><a href="#data">Data &amp; backup</a></li>
+          </ul>
+
+          <div class="settings-body">
+
+            <section class="settings-section" id="income">
+              <div class="settings-section__head">
+                <h3>Default income items</h3>
+                <p>Pre-fill these income additions and deductions for every new month. You can still add or remove items per month — this is just the template.</p>
+              </div>
+              <div class="settings-section__body">
+                <div class="row-item">
+                  <div class="ico" style="background: oklch(60% 0.07 175 / 0.15); color: var(--income); border-color: oklch(60% 0.07 175 / 0.4);">+</div>
+                  <div class="name">Gross invoice <small>Addition · Pre-tax revenue from your main client</small></div>
+                  <div class="pct"><span class="meta">addition</span></div>
+                  <input class="input input--mono" value="13 000,00" style="width: 110px; height: 32px;" />
+                  <button class="row-action" aria-label="Remove">✕</button>
+                </div>
+                <div class="row-item">
+                  <div class="ico" style="background: oklch(60% 0.13 6 / 0.12); color: var(--expense); border-color: oklch(60% 0.13 6 / 0.4);">−</div>
+                  <div class="name">VAT <small>Deduction · Goods &amp; services tax (PL: 23 %)</small></div>
+                  <div class="pct"><span class="meta">deduction</span></div>
+                  <input class="input input--mono" value="2 430,89" style="width: 110px; height: 32px;" />
+                  <button class="row-action">✕</button>
+                </div>
+                <div class="row-item">
+                  <div class="ico" style="background: oklch(60% 0.13 6 / 0.12); color: var(--expense); border-color: oklch(60% 0.13 6 / 0.4);">−</div>
+                  <div class="name">Income tax <small>Deduction · Personal income tax</small></div>
+                  <div class="pct"><span class="meta">deduction</span></div>
+                  <input class="input input--mono" value="2 008,13" style="width: 110px; height: 32px;" />
+                  <button class="row-action">✕</button>
+                </div>
+                <div class="row-item">
+                  <div class="ico" style="background: oklch(60% 0.13 6 / 0.12); color: var(--expense); border-color: oklch(60% 0.13 6 / 0.4);">−</div>
+                  <div class="name">ZUS <small>Deduction · Social security contributions</small></div>
+                  <div class="pct"><span class="meta">deduction</span></div>
+                  <input class="input input--mono" value="1 600,00" style="width: 110px; height: 32px;" />
+                  <button class="row-action">✕</button>
+                </div>
+                <button class="add-row-btn">＋ Add another default item</button>
+              </div>
+            </section>
+
+            <section class="settings-section" id="buffer">
+              <div class="settings-section__head">
+                <h3>Cash-flow targets</h3>
+                <p>The minimum balance each account should hold by month-end. Florin uses these to calculate top-up amounts after each paycheck.</p>
+              </div>
+              <div class="settings-section__body">
+                <div class="row-item">
+                  <div class="ico">🏦</div>
+                  <div class="name">Daily life · mBank Main <small>Minimum balance</small></div>
+                  <span></span>
+                  <input class="input input--mono" value="2 000,00" style="width: 110px; height: 32px;" />
+                  <button class="row-action">✕</button>
+                </div>
+                <div class="row-item">
+                  <div class="ico">💳</div>
+                  <div class="name">Pleasure · Revolut <small>Minimum balance</small></div>
+                  <span></span>
+                  <input class="input input--mono" value="1 100,00" style="width: 110px; height: 32px;" />
+                  <button class="row-action">✕</button>
+                </div>
+                <div class="row-item">
+                  <div class="ico">💼</div>
+                  <div class="name">Business · ING Direct <small>Minimum balance</small></div>
+                  <span></span>
+                  <input class="input input--mono" value="2 760,00" style="width: 110px; height: 32px;" />
+                  <button class="row-action">✕</button>
+                </div>
+                <button class="add-row-btn">＋ Add another buffer target</button>
+              </div>
+            </section>
+
+            <section class="settings-section" id="categories">
+              <div class="settings-section__head">
+                <h3>Categories</h3>
+                <p>Rename, recolor or reorder your budget categories. Percentage changes here apply to future months only — past months keep their original split.</p>
+              </div>
+              <div class="settings-section__body">
+                <div class="cat-mini">
+                  <span class="swatch" style="background: var(--cat-daily);"></span>
+                  <span class="name">Daily life</span>
+                  <span class="pct">40 %</span>
+                  <span class="meta">6 expenses · 1 042,18 PLN</span>
+                  <div class="actions"><button class="btn btn--ghost btn--sm">Edit</button></div>
+                </div>
+                <div class="cat-mini">
+                  <span class="swatch" style="background: var(--cat-shared);"></span>
+                  <span class="name">Shared</span>
+                  <span class="pct">20 %</span>
+                  <span class="meta">2 expenses · 289,00 PLN</span>
+                  <div class="actions"><button class="btn btn--ghost btn--sm">Edit</button></div>
+                </div>
+                <div class="cat-mini">
+                  <span class="swatch" style="background: var(--cat-saved);"></span>
+                  <span class="name">Saved</span>
+                  <span class="pct">20 %</span>
+                  <span class="meta">0 expenses</span>
+                  <div class="actions"><button class="btn btn--ghost btn--sm">Edit</button></div>
+                </div>
+                <div class="cat-mini">
+                  <span class="swatch" style="background: var(--cat-pleasure);"></span>
+                  <span class="name">Pleasure</span>
+                  <span class="pct">20 %</span>
+                  <span class="meta">6 expenses · 853,32 PLN</span>
+                  <div class="actions"><button class="btn btn--ghost btn--sm">Edit</button></div>
+                </div>
+                <button class="add-row-btn">＋ Add a category</button>
+                <div class="hint" style="margin-top: 16px;">
+                  ✨ Tip: a category called "Saved" with no expenses is your default monthly contribution to savings goals.
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-section" id="appearance">
+              <div class="settings-section__head">
+                <h3>Appearance</h3>
+                <p>Florin's brand stays the same in either mode — the rose softens, the plum warms, but everything else moves with you.</p>
+              </div>
+              <div class="settings-section__body">
+                <div class="theme-grid">
+                  <div class="theme-card is-active">
+                    <div class="preview">
+                      <div class="head"></div>
+                      <div class="body">
+                        <div class="side"></div>
+                        <div class="main">
+                          <div class="strip"></div>
+                          <div class="strip accent"></div>
+                          <div class="strip"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="lbl"><strong>Light · Petal</strong><span>Default</span></div>
+                  </div>
+                  <div class="theme-card dark">
+                    <div class="preview">
+                      <div class="head"></div>
+                      <div class="body">
+                        <div class="side"></div>
+                        <div class="main">
+                          <div class="strip"></div>
+                          <div class="strip accent" style="background: oklch(72% 0.10 340); border-color: oklch(72% 0.10 340);"></div>
+                          <div class="strip"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="lbl"><strong>Dark · Plum</strong><span>OLED-friendly</span></div>
+                  </div>
+                </div>
+                <hr class="card__hr" />
+                <div class="row row--between">
+                  <div>
+                    <label class="label" style="margin-bottom: 2px;">Match system theme</label>
+                    <p class="muted" style="font-size: 13px; margin: 0;">Switch automatically when macOS / Windows changes mode.</p>
+                  </div>
+                  <label class="toggle"><input type="checkbox" checked /><span class="toggle__slider"></span></label>
+                </div>
+                <hr class="card__hr" />
+                <div class="row row--between">
+                  <div>
+                    <label class="label" style="margin-bottom: 2px;">Compact density</label>
+                    <p class="muted" style="font-size: 13px; margin: 0;">Tighter padding for laptops &amp; long expense lists.</p>
+                  </div>
+                  <label class="toggle"><input type="checkbox" /><span class="toggle__slider"></span></label>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-section" id="language">
+              <div class="settings-section__head">
+                <h3>Language</h3>
+                <p>The whole interface swaps over instantly — including category names you defined yourself, where translations exist.</p>
+              </div>
+              <div class="settings-section__body">
+                <div class="lang-row">
+                  <div class="lang-card is-active">
+                    <div class="flag">🇬🇧</div>
+                    <div><strong>English</strong><small>Default · DD/MM/YYYY · PLN</small></div>
+                  </div>
+                  <div class="lang-card">
+                    <div class="flag">🇵🇱</div>
+                    <div><strong>Polski</strong><small>Pełne tłumaczenie · DD/MM/YYYY · PLN</small></div>
+                  </div>
+                </div>
+                <hr class="card__hr" />
+                <div class="row row--between">
+                  <div>
+                    <label class="label" style="margin-bottom: 2px;">Decimal separator</label>
+                    <p class="muted" style="font-size: 13px; margin: 0;">Florin auto-converts either, regardless of language.</p>
+                  </div>
+                  <div class="segmented">
+                    <button>1.234,56</button>
+                    <button class="is-active">1 234,56</button>
+                    <button>1,234.56</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-section" id="data">
+              <div class="settings-section__head">
+                <h3>Data &amp; backup</h3>
+                <p>Florin holds one SQLite file. You can copy it, export it, import a backup, or — if you really want to start fresh — wipe everything.</p>
+              </div>
+              <div class="settings-section__body">
+                <div class="data-list">
+                  <div class="data-row">
+                    <div class="info">
+                      <strong>Database location</strong>
+                      <p>Your data lives at <code>~/Library/Application Support/Florin/florin.db</code> — 248 KB, last modified just now.</p>
+                    </div>
+                    <div class="actions"><button class="btn btn--secondary btn--sm">Reveal in Finder</button></div>
+                  </div>
+                  <div class="data-row">
+                    <div class="info">
+                      <strong>Export</strong>
+                      <p>Save a snapshot of every month, expense and savings goal as JSON or a printable PDF report.</p>
+                    </div>
+                    <div class="actions">
+                      <button class="btn btn--secondary btn--sm">JSON</button>
+                      <button class="btn btn--secondary btn--sm">PDF report</button>
+                    </div>
+                  </div>
+                  <div class="data-row">
+                    <div class="info">
+                      <strong>Import</strong>
+                      <p>Bring in a previous Florin backup, or import a password-protected .xlsx budget file.</p>
+                    </div>
+                    <div class="actions"><button class="btn btn--secondary btn--sm">Choose file…</button></div>
+                  </div>
+                  <div class="data-row danger">
+                    <div class="info">
+                      <strong style="color: var(--error);">Reset all data</strong>
+                      <p>Permanently delete every month, expense and savings record. This cannot be undone — Florin will offer to make a backup first.</p>
+                    </div>
+                    <div class="actions"><button class="btn btn--danger btn--sm">Reset…</button></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section__head">
+                <h3>About Florin</h3>
+                <p>Made quietly for people whose income changes every month. MIT-licensed.</p>
+              </div>
+              <div class="settings-section__body">
+                <div class="row row--between">
+                  <div class="row" style="gap: 14px;">
+                    <img src="assets/logo.png" alt="" style="width: 48px; height: 48px; border-radius: 50%;" />
+                    <div>
+                      <strong style="display: block; font-family: var(--font-display); font-size: 18px; font-weight: 600;">Florin 0.6.2</strong>
+                      <span class="meta">Built 24 May 2026 · Python 3.12 · customtkinter 5.2</span>
+                    </div>
+                  </div>
+                  <div class="row">
+                    <a class="btn btn--ghost btn--sm" href="#">Release notes</a>
+                    <a class="btn btn--secondary btn--sm" href="#">Check for updates</a>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SCREEN: ONBOARDING (uses full-width layout, sidebar hidden)
+           ================================================================ -->
+      <div class="screen" data-screen-content="onboarding" style="height: 100%;">
+        <div class="onboard">
+          <aside class="onboard__rail">
+            <div class="onboard__brand">
+              <img src="assets/logo.png" alt="Florin logo" />
+              <span class="name">Florin</span>
+            </div>
+            <p class="onboard__caption">A few quiet questions before your first month. You can change everything later in Settings.</p>
+
+            <ol class="step-list" id="step-list">
+              <li data-step="1" class="is-done">
+                <span class="step-num">✓</span>
+                <div><div class="step-title">Welcome</div><div class="step-desc">Local-only, no account.</div></div>
+              </li>
+              <li data-step="2" class="is-active">
+                <span class="step-num">2</span>
+                <div><div class="step-title">Categories</div><div class="step-desc">How you split each month's income.</div></div>
+              </li>
+              <li data-step="3" class="is-pending">
+                <span class="step-num">3</span>
+                <div><div class="step-title">Cash-flow buffer</div><div class="step-desc">Minimum balances per account.</div></div>
+              </li>
+              <li data-step="4" class="is-pending">
+                <span class="step-num">4</span>
+                <div><div class="step-title">Default income</div><div class="step-desc">Standard deductions to pre-fill.</div></div>
+              </li>
+            </ol>
+
+            <div class="rail-quote">
+              <strong>A note on percentages</strong>
+              Florin always works with percentages, not amounts — so when your income changes, your plan still works. The math is automatic.
+            </div>
+          </aside>
+
+          <main class="onboard__main">
+            <div class="onboard__head">
+              <span class="eyebrow"><span class="dot">●</span> Step 2 of 4 · Categories</span>
+              <h1>How would you like to <em>split each paycheck?</em></h1>
+              <p>These are the buckets your net income flows into automatically every month. Florin starts you with a sensible default — adjust the percentages to match how you actually live, or rename anything.</p>
+            </div>
+
+            <div class="cat-edit">
+              <div class="cat-edit__head">
+                <h3>Your categories</h3>
+                <span class="net-pill">Sample net income · 6 960,98 PLN</span>
+              </div>
+
+              <div class="cat-row-edit" data-cat="daily" data-amount="6960.98">
+                <span class="swatch" style="background: var(--cat-daily);" title="Change color"></span>
+                <input class="name-input" value="Daily life" />
+                <div class="slider-cell">
+                  <input class="slider" type="range" min="0" max="100" value="40" data-cat-target="daily" style="accent-color: var(--cat-daily);" />
+                  <div class="ticks"><span>0%</span><span>50%</span><span>100%</span></div>
+                </div>
+                <input class="input pct-input" value="40 %" data-cat-pct="daily" style="height: 32px;" />
+                <span class="amt-cell" data-cat-amt="daily">2 784,39 PLN</span>
+                <button class="row-action" aria-label="Remove">✕</button>
+              </div>
+
+              <div class="cat-row-edit" data-cat="shared">
+                <span class="swatch" style="background: var(--cat-shared);"></span>
+                <input class="name-input" value="Shared" />
+                <div class="slider-cell">
+                  <input class="slider" type="range" min="0" max="100" value="20" data-cat-target="shared" style="accent-color: var(--cat-shared);" />
+                  <div class="ticks"><span>0%</span><span>50%</span><span>100%</span></div>
+                </div>
+                <input class="input pct-input" value="20 %" data-cat-pct="shared" style="height: 32px;" />
+                <span class="amt-cell" data-cat-amt="shared">1 392,20 PLN</span>
+                <button class="row-action" aria-label="Remove">✕</button>
+              </div>
+
+              <div class="cat-row-edit" data-cat="saved">
+                <span class="swatch" style="background: var(--cat-saved);"></span>
+                <input class="name-input" value="Saved" />
+                <div class="slider-cell">
+                  <input class="slider" type="range" min="0" max="100" value="20" data-cat-target="saved" style="accent-color: var(--cat-saved);" />
+                  <div class="ticks"><span>0%</span><span>50%</span><span>100%</span></div>
+                </div>
+                <input class="input pct-input" value="20 %" data-cat-pct="saved" style="height: 32px;" />
+                <span class="amt-cell" data-cat-amt="saved">1 392,20 PLN</span>
+                <button class="row-action" aria-label="Remove">✕</button>
+              </div>
+
+              <div class="cat-row-edit" data-cat="pleasure">
+                <span class="swatch" style="background: var(--cat-pleasure);"></span>
+                <input class="name-input" value="Pleasure" />
+                <div class="slider-cell">
+                  <input class="slider" type="range" min="0" max="100" value="20" data-cat-target="pleasure" style="accent-color: var(--cat-pleasure);" />
+                  <div class="ticks"><span>0%</span><span>50%</span><span>100%</span></div>
+                </div>
+                <input class="input pct-input" value="20 %" data-cat-pct="pleasure" style="height: 32px;" />
+                <span class="amt-cell" data-cat-amt="pleasure">1 392,20 PLN</span>
+                <button class="row-action" aria-label="Remove">✕</button>
+              </div>
+
+              <button class="cat-edit__add">＋ Add another category</button>
+
+              <div class="total-row">
+                <span class="lbl">Total</span>
+                <span></span>
+                <span class="pct" id="cat-total-pct">100 %</span>
+                <span class="amt" id="cat-total-amt">6 960,98 PLN</span>
+                <span></span>
+              </div>
+            </div>
+
+            <div class="hint">
+              🌸 Tip: percentages must add up to 100 %. Drag a slider, or type — Florin balances the rest automatically.
+            </div>
+
+            <div class="onboard__foot">
+              <span class="progress-text">2 / 4 · Categories</span>
+              <div class="actions">
+                <button class="btn btn--ghost" data-screen="dashboard">Skip for now</button>
+                <button class="btn btn--secondary">‹ Back</button>
+                <button class="btn btn--primary" data-screen="dashboard">Continue ›</button>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           STUB SCREENS — Income / Savings / Cashflow / History
+           ================================================================ -->
+      <!-- ================================================================
+           SCREEN: INCOME
+           ================================================================ -->
+      <div class="screen" data-screen-content="income">
+        <header class="topbar">
+          <h1>Income</h1>
+          <div class="grow"></div>
+          <div class="month-switcher">
+            <button aria-label="Previous month">‹</button>
+            <span class="label">April 2026</span>
+            <button aria-label="Next month">›</button>
+          </div>
+          <button class="btn btn--ghost btn--sm">✎ Edit</button>
+          <button class="btn btn--primary btn--sm">＋ Log invoice</button>
+        </header>
+
+        <div class="content">
+
+          <!-- Net hero -->
+          <section class="inc-hero">
+            <div>
+              <span class="eyebrow"><span class="dot">●</span> Net · April 2026</span>
+              <div class="inc-hero__amount">6 960,98<span class="unit">PLN</span></div>
+              <div class="inc-hero__formula">
+                Gross 13 000,00<span class="op">−</span>VAT 2 430,89<span class="op">−</span>Tax 2 008,13<span class="op">−</span>ZUS 1 600,00
+              </div>
+              <div class="inc-hero__sub">One invoice plus a 500,00 freelance bonus targeted at Pleasure. Edit any line below to recompute.</div>
+            </div>
+            <div class="inc-hero__cta">
+              <span class="meta">Last edited 2 days ago</span>
+              <button class="btn btn--secondary btn--sm">Recalculate from gross</button>
+            </div>
+          </section>
+
+          <!-- Items table -->
+          <section class="inc-table-wrap" style="margin-top: 16px;">
+            <header class="inc-table-wrap__head">
+              <h4>Income items · April</h4>
+              <span class="meta">5 entries · 1 invoice + 1 bonus + 3 deductions</span>
+            </header>
+            <table class="inc-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Type</th>
+                  <th class="num-col">Amount</th>
+                  <th>Target</th>
+                  <th aria-label="Actions"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="item-name">
+                    <strong>Gross invoice</strong>
+                    <small>Acme Studio · FV 04/2026</small>
+                  </td>
+                  <td><span class="pill pill--neutral" style="font-size: 11px;">Addition</span></td>
+                  <td class="num-col" style="color: var(--income);">+ 13 000,00</td>
+                  <td><span class="meta">— proportional</span></td>
+                  <td><button class="row-action" aria-label="Remove" title="Locked">🔒</button></td>
+                </tr>
+                <tr>
+                  <td class="item-name">
+                    <strong>VAT</strong>
+                    <small>23% on net · auto-calculated</small>
+                  </td>
+                  <td><span class="pill" style="background: oklch(67% 0.15 25 / 0.10); border-color: oklch(67% 0.15 25 / 0.35); color: var(--expense); font-size: 11px;">Deduction</span></td>
+                  <td class="num-col" style="color: var(--expense);">− 2 430,89</td>
+                  <td><span class="meta">— locked</span></td>
+                  <td><button class="row-action" aria-label="Remove" title="Locked">🔒</button></td>
+                </tr>
+                <tr>
+                  <td class="item-name">
+                    <strong>Income tax</strong>
+                    <small>Liniowy 19% · auto-calculated</small>
+                  </td>
+                  <td><span class="pill" style="background: oklch(67% 0.15 25 / 0.10); border-color: oklch(67% 0.15 25 / 0.35); color: var(--expense); font-size: 11px;">Deduction</span></td>
+                  <td class="num-col" style="color: var(--expense);">− 2 008,13</td>
+                  <td><span class="meta">— locked</span></td>
+                  <td><button class="row-action" aria-label="Remove" title="Locked">🔒</button></td>
+                </tr>
+                <tr>
+                  <td class="item-name">
+                    <strong>ZUS</strong>
+                    <small>Składka pełna · April 2026</small>
+                  </td>
+                  <td><span class="pill" style="background: oklch(67% 0.15 25 / 0.10); border-color: oklch(67% 0.15 25 / 0.35); color: var(--expense); font-size: 11px;">Deduction</span></td>
+                  <td class="num-col" style="color: var(--expense);">− 1 600,00</td>
+                  <td><span class="meta">— locked</span></td>
+                  <td><button class="row-action" aria-label="Remove" title="Locked">🔒</button></td>
+                </tr>
+                <tr>
+                  <td class="item-name">
+                    <strong>Freelance bonus</strong>
+                    <small>One-off side gig · paid 18 Apr</small>
+                  </td>
+                  <td><span class="pill pill--neutral" style="font-size: 11px;">Addition</span></td>
+                  <td class="num-col" style="color: var(--income);">+ 500,00</td>
+                  <td><span class="pill pill--pleasure" style="font-size: 11px;"><span class="pill__dot"></span>Pleasure</span></td>
+                  <td><button class="row-action" aria-label="Remove">✕</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <footer class="inc-table-wrap__foot">
+              <button class="btn btn--ghost btn--sm">＋ Addition</button>
+              <button class="btn btn--ghost btn--sm">＋ Deduction</button>
+              <span class="meta" style="margin-left: auto;">Net = additions − deductions</span>
+            </footer>
+          </section>
+
+          <!-- Allocation strip -->
+          <section class="inc-alloc" style="margin-top: 16px;">
+            <div class="inc-alloc__donut" aria-hidden="true"></div>
+            <div class="inc-alloc__legend">
+              <div class="item" style="border-color: var(--cat-daily);">
+                <span class="lbl">Daily life</span>
+                <span class="pct">40%</span>
+                <span class="num">2 784,39</span>
+              </div>
+              <div class="item" style="border-color: var(--cat-shared);">
+                <span class="lbl">Shared</span>
+                <span class="pct">20%</span>
+                <span class="num">1 392,20</span>
+              </div>
+              <div class="item" style="border-color: var(--cat-saved);">
+                <span class="lbl">Saved</span>
+                <span class="pct">20%</span>
+                <span class="num">1 392,20</span>
+              </div>
+              <div class="item" style="border-color: var(--cat-pleasure);">
+                <span class="lbl">Pleasure</span>
+                <span class="pct">20% + 500,00</span>
+                <span class="num">1 892,20</span>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+              <span class="meta">How net 6 960,98 splits</span>
+              <button class="btn btn--ghost btn--sm" data-screen="settings">Edit split ↗</button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SCREEN: SAVINGS
+           ================================================================ -->
+      <div class="screen" data-screen-content="savings">
+        <header class="topbar">
+          <h1>Savings</h1>
+          <div class="grow"></div>
+          <div class="year-picker" role="group" aria-label="Year">
+            <button aria-label="Previous year">‹</button>
+            <button class="is-active" aria-current="true">2026</button>
+            <button aria-label="Next year">›</button>
+          </div>
+          <button class="btn btn--ghost btn--sm">✎ Edit</button>
+          <button class="btn btn--secondary btn--sm">＋ Group</button>
+          <button class="btn btn--primary btn--sm">＋ Goal</button>
+        </header>
+
+        <div class="content">
+
+          <!-- Year summary -->
+          <section class="sv-summary">
+            <div class="sv-summary__cell">
+              <span class="lbl">Saved this year</span>
+              <span class="num" style="color: var(--success);">2 350,00</span>
+              <span class="sub">Across 6 active goals · January – April</span>
+            </div>
+            <div class="sv-summary__divider"></div>
+            <div class="sv-summary__cell">
+              <span class="lbl">On plan</span>
+              <span class="num">78%</span>
+              <span class="sub">Saved vs. planned-to-date · 4 months in</span>
+            </div>
+            <div class="sv-summary__divider"></div>
+            <div class="sv-summary__cell">
+              <span class="lbl">Goals met</span>
+              <span class="num">2 <span style="color: var(--muted); font-weight: 500; font-size: 14px;">/ 6</span></span>
+              <span class="sub">Christmas fund &amp; Mum's birthday already done</span>
+            </div>
+          </section>
+
+          <!-- Actual savings table -->
+          <section class="sv-section" style="margin-top: 16px;">
+            <header class="sv-section__head">
+              <h4>Actual savings <span class="count">· what's already in each pot</span></h4>
+              <span class="meta">Months · Saved · Missing · % · Spent · Balance</span>
+            </header>
+            <div class="sv-section__scroll">
+              <table class="sv-grid">
+                <thead>
+                  <tr>
+                    <th class="cat-col">Category</th>
+                    <th class="month-col">J</th>
+                    <th class="month-col">F</th>
+                    <th class="month-col">M</th>
+                    <th class="month-col is-current">A</th>
+                    <th class="month-col">M</th>
+                    <th class="month-col">J</th>
+                    <th class="month-col">J</th>
+                    <th class="month-col">A</th>
+                    <th class="month-col">S</th>
+                    <th class="month-col">O</th>
+                    <th class="month-col">N</th>
+                    <th class="month-col">D</th>
+                    <th class="sum-col">Saved</th>
+                    <th class="sum-col">Miss</th>
+                    <th class="sum-col">%</th>
+                    <th class="sum-col">Spent</th>
+                    <th class="sum-col">Bal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="cat-col"><strong>Lokata 6M</strong><small>Goal 600,00 · Dec</small></td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="met-plan">200</td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="cell-empty">·</td>
+                    <td class="is-deadline">·</td>
+                    <td class="sum-col">200</td>
+                    <td class="sum-col under-plan">300</td>
+                    <td class="sum-col under-plan">40%</td>
+                    <td class="sum-col">150</td>
+                    <td class="sum-col" style="color: var(--success);">+ 50</td>
+                  </tr>
+
+                  <tr class="is-group" data-group-toggle="travel">
+                    <td class="cat-col"><span class="caret">▸</span>Travel <small style="color: var(--muted); font-weight: 500; margin-left: 6px;">3 goals · 1 200,00 target</small></td>
+                    <td>·</td><td>·</td><td>·</td><td>200</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col">200</td>
+                    <td class="sum-col under-plan">1 000</td>
+                    <td class="sum-col under-plan">17%</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col" style="color: var(--success);">+ 200</td>
+                  </tr>
+                  <tr data-group="travel">
+                    <td class="cat-col"><strong>Summer trip · Croatia</strong><small>Goal 800,00 · Jul</small></td>
+                    <td>·</td><td>·</td><td>·</td><td class="under-plan">100</td><td>·</td><td>·</td><td class="is-deadline cell-empty">·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col">100</td>
+                    <td class="sum-col under-plan">700</td>
+                    <td class="sum-col under-plan">13%</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col" style="color: var(--success);">+ 100</td>
+                  </tr>
+                  <tr data-group="travel">
+                    <td class="cat-col"><strong>Weekend in Tatry</strong><small>Goal 300,00 · Jun</small></td>
+                    <td>·</td><td>·</td><td>·</td><td>100</td><td>·</td><td class="is-deadline cell-empty">·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col">100</td>
+                    <td class="sum-col under-plan">200</td>
+                    <td class="sum-col under-plan">33%</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col" style="color: var(--success);">+ 100</td>
+                  </tr>
+                  <tr data-group="travel">
+                    <td class="cat-col"><strong>Visit Lisbon</strong><small>Goal 100,00 · Aug</small></td>
+                    <td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td class="is-deadline cell-empty">·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col under-plan">100</td>
+                    <td class="sum-col under-plan">0%</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col">0</td>
+                  </tr>
+
+                  <tr class="is-group" data-group-toggle="gifts" data-expanded="true">
+                    <td class="cat-col"><span class="caret">▸</span>Gifts <small style="color: var(--muted); font-weight: 500; margin-left: 6px;">3 goals · 250,00 target</small></td>
+                    <td>·</td><td>·</td><td>·</td><td>·</td><td>50</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>100</td><td>·</td>
+                    <td class="sum-col">150</td>
+                    <td class="sum-col under-plan">100</td>
+                    <td class="sum-col under-plan">60%</td>
+                    <td class="sum-col">100</td>
+                    <td class="sum-col" style="color: var(--success);">+ 50</td>
+                  </tr>
+                  <tr data-group="gifts" class="is-shown">
+                    <td class="cat-col"><strong>Mum's birthday</strong><small>Goal 50,00 · May</small></td>
+                    <td>·</td><td>·</td><td>·</td><td>·</td><td class="met-plan is-deadline">50</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col">50</td>
+                    <td class="sum-col" style="color: var(--success);">0</td>
+                    <td class="sum-col" style="color: var(--success);">100%</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col" style="color: var(--success);">+ 50</td>
+                  </tr>
+                  <tr data-group="gifts" class="is-shown">
+                    <td class="cat-col"><strong>Christmas fund</strong><small>Goal 100,00 · Nov</small></td>
+                    <td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td class="met-plan is-deadline">100</td><td>·</td>
+                    <td class="sum-col">100</td>
+                    <td class="sum-col" style="color: var(--success);">0</td>
+                    <td class="sum-col" style="color: var(--success);">100%</td>
+                    <td class="sum-col">100</td>
+                    <td class="sum-col">0</td>
+                  </tr>
+                  <tr data-group="gifts" class="is-shown">
+                    <td class="cat-col"><strong>Anniversary</strong><small>Goal 100,00 · Sep</small></td>
+                    <td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td class="is-deadline cell-empty">·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col under-plan">100</td>
+                    <td class="sum-col under-plan">0%</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col">0</td>
+                  </tr>
+
+                  <tr>
+                    <td class="cat-col"><strong>Emergency fund</strong><small>Goal 3 000,00 · ongoing</small></td>
+                    <td>500</td><td>500</td><td>500</td><td class="under-plan">300</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col">1 800</td>
+                    <td class="sum-col under-plan">1 200</td>
+                    <td class="sum-col under-plan">60%</td>
+                    <td class="sum-col">0</td>
+                    <td class="sum-col" style="color: var(--success);">+ 1 800</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Planning grid -->
+          <section class="sv-section" style="margin-top: 16px;">
+            <header class="sv-section__head">
+              <h4>Planning grid <span class="count">· what's intended each month</span></h4>
+              <span class="meta" style="display: inline-flex; align-items: center; gap: 10px;">
+                <span><span class="dot" style="background: var(--accent);"></span> deadline</span>
+                <span><span class="dot" style="background: oklch(75% 0.10 80 / 0.4);"></span> current month</span>
+                <span><span class="dot" style="background: var(--accent-soft); border: 1px solid var(--accent);"></span> cascade</span>
+              </span>
+            </header>
+            <div class="sv-section__scroll">
+              <table class="sv-grid">
+                <thead>
+                  <tr>
+                    <th class="cat-col">Category</th>
+                    <th class="month-col">J</th>
+                    <th class="month-col">F</th>
+                    <th class="month-col">M</th>
+                    <th class="month-col is-current">A</th>
+                    <th class="month-col">M</th>
+                    <th class="month-col">J</th>
+                    <th class="month-col">J</th>
+                    <th class="month-col">A</th>
+                    <th class="month-col">S</th>
+                    <th class="month-col">O</th>
+                    <th class="month-col">N</th>
+                    <th class="month-col">D</th>
+                    <th class="sum-col" colspan="2" style="width: 180px;">Progress to deadline</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="cat-col"><strong>Lokata 6M</strong><small>Deadline · Dec</small></td>
+                    <td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td class="is-deadline">50</td>
+                    <td class="sum-col" colspan="2">
+                      <div class="progress-mini"><div class="bar is-low"><span style="width: 33%;"></span></div><span class="pct">33%</span></div>
+                    </td>
+                  </tr>
+
+                  <tr class="is-group" data-group-toggle="travel-plan" data-expanded="true">
+                    <td class="cat-col"><span class="caret">▸</span>Travel <small style="color: var(--muted); font-weight: 500; margin-left: 6px;">3 goals</small></td>
+                    <td>200</td><td>200</td><td>200</td><td>200</td><td>200</td><td>150</td><td>150</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col" colspan="2">
+                      <div class="progress-mini"><div class="bar is-low"><span style="width: 30%;"></span></div><span class="pct">30%</span></div>
+                    </td>
+                  </tr>
+                  <tr data-group="travel-plan" class="is-shown">
+                    <td class="cat-col"><strong>Summer trip · Croatia</strong><small>Goal 800,00 · Jul</small></td>
+                    <td>100</td><td>100</td><td>100</td><td>100</td><td>100</td><td class="cell-cascade"><span class="strike">100</span>50</td><td class="is-deadline">50</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col" colspan="2">
+                      <div class="progress-mini"><div class="bar is-low"><span style="width: 25%;"></span></div><span class="pct">25%</span></div>
+                    </td>
+                  </tr>
+                  <tr data-group="travel-plan" class="is-shown">
+                    <td class="cat-col"><strong>Weekend in Tatry</strong><small>Goal 300,00 · Jun</small></td>
+                    <td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td class="is-deadline">50</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col" colspan="2">
+                      <div class="progress-mini"><div class="bar is-low"><span style="width: 67%;"></span></div><span class="pct">67%</span></div>
+                    </td>
+                  </tr>
+                  <tr data-group="travel-plan" class="is-shown">
+                    <td class="cat-col"><strong>Visit Lisbon</strong><small>Goal 100,00 · Aug</small></td>
+                    <td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>50</td><td>100</td><td class="is-deadline">·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col" colspan="2">
+                      <div class="progress-mini"><div class="bar"><span style="width: 100%;"></span></div><span class="pct">100%</span></div>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td class="cat-col"><strong>Emergency fund</strong><small>Ongoing · top up monthly</small></td>
+                    <td>500</td><td>500</td><td>500</td><td>500</td><td>500</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td>
+                    <td class="sum-col" colspan="2">
+                      <div class="progress-mini"><div class="bar is-low"><span style="width: 60%;"></span></div><span class="pct">60%</span></div>
+                    </td>
+                  </tr>
+
+                  <tr class="is-totals">
+                    <td class="cat-col">Assumed available</td>
+                    <td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td><td>1 740</td>
+                    <td class="sum-col" colspan="2"></td>
+                  </tr>
+                  <tr class="is-totals">
+                    <td class="cat-col">Total allocated</td>
+                    <td>1 100</td><td>1 100</td><td>1 100</td><td>1 100</td><td>1 100</td><td>1 050</td><td>950</td><td>800</td><td>800</td><td>800</td><td>800</td><td>800</td>
+                    <td class="sum-col" colspan="2"></td>
+                  </tr>
+                  <tr class="is-totals is-remaining">
+                    <td class="cat-col">Remaining</td>
+                    <td class="is-pos">+ 640</td><td class="is-pos">+ 640</td><td class="is-pos">+ 640</td><td class="is-pos">+ 640</td><td class="is-pos">+ 640</td><td class="is-pos">+ 690</td><td class="is-pos">+ 790</td><td class="is-pos">+ 940</td><td class="is-pos">+ 940</td><td class="is-pos">+ 940</td><td class="is-pos">+ 940</td><td class="is-pos">+ 940</td>
+                    <td class="sum-col" colspan="2"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SCREEN: CASH FLOW
+           ================================================================ -->
+      <div class="screen" data-screen-content="cashflow">
+        <header class="topbar">
+          <h1>Cash flow</h1>
+          <div class="grow"></div>
+          <div class="month-switcher">
+            <button aria-label="Previous month">‹</button>
+            <span class="label">April 2026</span>
+            <button aria-label="Next month">›</button>
+          </div>
+          <button class="btn btn--ghost btn--sm">✎ Edit balances</button>
+          <button class="btn btn--secondary btn--sm" data-screen="settings">Adjust targets ↗</button>
+        </header>
+
+        <div class="content">
+
+          <!-- Big result card -->
+          <section class="cf-result">
+            <div class="cf-result__primary">
+              <span class="eyebrow"><span class="dot">●</span> Top-up needed this month</span>
+              <div class="cf-result__amount">1 430,00<span class="unit">PLN</span></div>
+              <div class="cf-result__sub">After your April invoice clears, move this from the business account into Daily life and Pleasure to bring every buffer back to its minimum.</div>
+            </div>
+            <div class="cf-result__divider" aria-hidden="true"></div>
+            <div class="cf-result__secondary">
+              <span class="meta">Free for savings after top-ups</span>
+              <div class="cf-result__free">5 530,98<span class="unit">PLN</span></div>
+              <span class="meta-sub">Net 6 960,98 − Top-up 1 430,00</span>
+              <button class="btn btn--primary btn--sm" data-screen="savings">Allocate to goals →</button>
+            </div>
+          </section>
+
+          <!-- Per-buffer row -->
+          <section class="cf-buffers" style="margin-top: 16px;">
+
+            <article class="cf-buffer">
+              <div class="cf-buffer__head">
+                <div class="cf-buffer__ico">🪙</div>
+                <div class="cf-buffer__title">
+                  <strong>Daily life</strong>
+                  <small>mBank · konto główne</small>
+                </div>
+              </div>
+              <div class="cf-buffer__rows">
+                <span class="lbl">Now</span><span class="num">1 380,00</span>
+                <span class="lbl">Minimum target</span><span class="num">2 000,00</span>
+              </div>
+              <div class="cf-buffer__topup">
+                <span class="lbl">Top up</span>
+                <span class="num" style="color: var(--accent);">+ 620,00</span>
+              </div>
+              <div class="cf-buffer__bar">
+                <div class="progress"><span style="width: 69%;"></span></div>
+                <span class="cf-buffer__caption">69% funded · last updated 2 days ago</span>
+              </div>
+            </article>
+
+            <article class="cf-buffer">
+              <div class="cf-buffer__head">
+                <div class="cf-buffer__ico">🌸</div>
+                <div class="cf-buffer__title">
+                  <strong>Pleasure</strong>
+                  <small>Revolut · pleasure pocket</small>
+                </div>
+              </div>
+              <div class="cf-buffer__rows">
+                <span class="lbl">Now</span><span class="num">950,00</span>
+                <span class="lbl">Minimum target</span><span class="num">1 100,00</span>
+              </div>
+              <div class="cf-buffer__topup">
+                <span class="lbl">Top up</span>
+                <span class="num" style="color: var(--accent);">+ 150,00</span>
+              </div>
+              <div class="cf-buffer__bar">
+                <div class="progress"><span style="width: 86%;"></span></div>
+                <span class="cf-buffer__caption">86% funded · last updated yesterday</span>
+              </div>
+            </article>
+
+            <article class="cf-buffer is-funded">
+              <div class="cf-buffer__head">
+                <div class="cf-buffer__ico is-funded">✓</div>
+                <div class="cf-buffer__title">
+                  <strong>Business</strong>
+                  <small>mBank firmowe · ZUS &amp; tax reserve</small>
+                </div>
+              </div>
+              <div class="cf-buffer__rows">
+                <span class="lbl">Now</span><span class="num">3 100,00</span>
+                <span class="lbl">Minimum target</span><span class="num">2 760,00</span>
+              </div>
+              <div class="cf-buffer__topup">
+                <span class="lbl">Top up</span>
+                <span class="num" style="color: var(--success);">— funded</span>
+              </div>
+              <div class="cf-buffer__bar">
+                <div class="progress"><span style="width: 100%; background: var(--success);"></span></div>
+                <span class="cf-buffer__caption">+ 340,00 over minimum · stays in reserve</span>
+              </div>
+            </article>
+
+          </section>
+
+          <!-- Recent edits log -->
+          <section class="cf-edits" style="margin-top: 16px;">
+            <header class="cf-edits__head">
+              <h4>Recent edits</h4>
+              <span class="meta">Last 5 changes across all buffers</span>
+            </header>
+            <div class="cf-edit-row">
+              <span class="ico">🪙</span>
+              <span class="desc"><strong>Daily life</strong> balance updated <span class="sub">1 420,00 → 1 380,00</span></span>
+              <span class="delta" style="color: var(--expense);">− 40,00</span>
+              <span class="when">2 DAYS AGO</span>
+            </div>
+            <div class="cf-edit-row">
+              <span class="ico">🌸</span>
+              <span class="desc"><strong>Pleasure</strong> balance updated <span class="sub">1 010,00 → 950,00</span></span>
+              <span class="delta" style="color: var(--expense);">− 60,00</span>
+              <span class="when">YESTERDAY</span>
+            </div>
+            <div class="cf-edit-row">
+              <span class="ico">🌸</span>
+              <span class="desc"><strong>Pleasure</strong> minimum target raised <span class="sub">1 000,00 → 1 100,00</span></span>
+              <span class="delta" style="color: var(--accent);">target ↑</span>
+              <span class="when">LAST MONTH</span>
+            </div>
+            <div class="cf-edit-row">
+              <span class="ico">✓</span>
+              <span class="desc"><strong>Business</strong> balance updated <span class="sub">2 950,00 → 3 100,00</span></span>
+              <span class="delta" style="color: var(--success);">+ 150,00</span>
+              <span class="when">LAST MONTH</span>
+            </div>
+            <div class="cf-edit-row">
+              <span class="ico">🪙</span>
+              <span class="desc"><strong>Daily life</strong> minimum target raised <span class="sub">1 800,00 → 2 000,00</span></span>
+              <span class="delta" style="color: var(--accent);">target ↑</span>
+              <span class="when">LAST MONTH</span>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SCREEN: HISTORY
+           ================================================================ -->
+      <div class="screen" data-screen-content="history">
+        <header class="topbar">
+          <h1>History</h1>
+          <div class="grow"></div>
+          <div class="search" style="width: 260px;">
+            <input class="input" type="search" placeholder="Search a month or expense…" />
+          </div>
+          <div class="year-picker" role="group" aria-label="Year">
+            <button aria-label="Previous year">‹</button>
+            <button class="is-active" aria-current="true">2026</button>
+            <button aria-label="Next year">›</button>
+          </div>
+          <button class="btn btn--secondary btn--sm">Export year ↗</button>
+        </header>
+
+        <div class="content">
+
+          <!-- Year strip -->
+          <section class="hist-strip">
+            <div class="hist-strip__year">
+              <span class="year">2026</span>
+              <span class="sub">4 months tracked · January – April</span>
+            </div>
+            <div class="hist-strip__divider"></div>
+            <div class="hist-strip__cell">
+              <span class="lbl">Net income</span>
+              <span class="num" style="color: var(--income);">27 843,92</span>
+            </div>
+            <div class="hist-strip__cell">
+              <span class="lbl">Spent</span>
+              <span class="num" style="color: var(--expense);">12 220,40</span>
+            </div>
+            <div class="hist-strip__cell">
+              <span class="lbl">Saved</span>
+              <span class="num">2 350,00</span>
+            </div>
+          </section>
+
+          <!-- Month rows -->
+          <section class="hist-list" style="margin-top: 16px;">
+
+            <article class="hist-row is-expanded" data-history-row="apr-2026">
+              <button class="hist-row__head" type="button" aria-expanded="true">
+                <span class="hist-row__label">April <span class="year">2026</span></span>
+                <span class="hist-row__stats">
+                  Spent <span class="num">2 184,50</span> · 47 items
+                  <span style="margin: 0 8px; color: var(--faint);">|</span>
+                  Saved <span class="num">300,00</span>
+                </span>
+                <span class="hist-row__pills">
+                  <span class="pill pill--daily"><span class="pill__dot"></span>40</span>
+                  <span class="pill pill--shared"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--saved"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--pleasure"><span class="pill__dot"></span>20</span>
+                </span>
+                <span class="hist-row__net">
+                  <span class="lbl">Net</span>
+                  <span class="num">6 960,98</span>
+                </span>
+                <span class="hist-row__caret" aria-hidden="true">›</span>
+              </button>
+              <div class="hist-row__expand">
+                <div class="hist-snapshot">
+                  <div class="hist-snap-card">
+                    <h5>Allocation snapshot</h5>
+                    <div class="donut-mini" style="background: conic-gradient(var(--cat-daily) 0% 40%, var(--cat-shared) 40% 60%, var(--cat-saved) 60% 80%, var(--cat-pleasure) 80% 100%);">
+                      <div class="center">
+                        <span class="num">6 960,98</span>
+                        <span class="lbl">Net · Apr</span>
+                      </div>
+                    </div>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name"><span class="pill pill--daily" style="font-size: 10px;"><span class="pill__dot"></span>Daily life</span></span><span class="num">2 784,39</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--shared" style="font-size: 10px;"><span class="pill__dot"></span>Shared</span></span><span class="num">1 392,20</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--saved" style="font-size: 10px;"><span class="pill__dot"></span>Saved</span></span><span class="num">1 392,20</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--pleasure" style="font-size: 10px;"><span class="pill__dot"></span>Pleasure</span></span><span class="num">1 892,20</span></div>
+                    </div>
+                  </div>
+
+                  <div class="hist-snap-card">
+                    <h5>Top expense categories</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Groceries <small>14 items</small></span><span class="num" style="color: var(--expense);">− 642,80</span></div>
+                      <div class="item"><span class="name">Eating out <small>9 items</small></span><span class="num" style="color: var(--expense);">− 410,20</span></div>
+                      <div class="item"><span class="name">Transport <small>6 items</small></span><span class="num" style="color: var(--expense);">− 318,40</span></div>
+                      <div class="item"><span class="name">Beauty &amp; care <small>4 items</small></span><span class="num" style="color: var(--expense);">− 285,00</span></div>
+                      <div class="item"><span class="name">Subscriptions <small>5 items</small></span><span class="num" style="color: var(--expense);">− 188,90</span></div>
+                      <div class="total"><span>Total spent</span><span class="num" style="color: var(--expense);">− 2 184,50</span></div>
+                    </div>
+                  </div>
+
+                  <div class="hist-snap-card">
+                    <h5>Account balances · end of April</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Cash <small>physical wallet</small></span><span class="num">300,00</span></div>
+                      <div class="item"><span class="name">mBank <small>daily life</small></span><span class="num">1 380,00</span></div>
+                      <div class="item"><span class="name">Revolut <small>pleasure</small></span><span class="num">950,00</span></div>
+                      <div class="item"><span class="name">mBank firmowe <small>business</small></span><span class="num">3 100,00</span></div>
+                      <div class="item"><span class="name">Lokata 6M <small>savings · Lokata 6M</small></span><span class="num">200,00</span></div>
+                      <div class="total"><span>Total assets</span><span class="num" style="color: var(--income);">5 930,00</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="hist-row" data-history-row="mar-2026">
+              <button class="hist-row__head" type="button" aria-expanded="false">
+                <span class="hist-row__label">March <span class="year">2026</span></span>
+                <span class="hist-row__stats">
+                  Spent <span class="num">3 010,12</span> · 62 items
+                  <span style="margin: 0 8px; color: var(--faint);">|</span>
+                  Saved <span class="num">700,00</span>
+                </span>
+                <span class="hist-row__pills">
+                  <span class="pill pill--daily"><span class="pill__dot"></span>40</span>
+                  <span class="pill pill--shared"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--saved"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--pleasure"><span class="pill__dot"></span>20</span>
+                </span>
+                <span class="hist-row__net">
+                  <span class="lbl">Net</span>
+                  <span class="num">7 102,30</span>
+                </span>
+                <span class="hist-row__caret" aria-hidden="true">›</span>
+              </button>
+              <div class="hist-row__expand">
+                <div class="hist-snapshot">
+                  <div class="hist-snap-card">
+                    <h5>Allocation snapshot</h5>
+                    <div class="donut-mini" style="background: conic-gradient(var(--cat-daily) 0% 40%, var(--cat-shared) 40% 60%, var(--cat-saved) 60% 80%, var(--cat-pleasure) 80% 100%);">
+                      <div class="center">
+                        <span class="num">7 102,30</span>
+                        <span class="lbl">Net · Mar</span>
+                      </div>
+                    </div>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name"><span class="pill pill--daily" style="font-size: 10px;"><span class="pill__dot"></span>Daily life</span></span><span class="num">2 840,92</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--shared" style="font-size: 10px;"><span class="pill__dot"></span>Shared</span></span><span class="num">1 420,46</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--saved" style="font-size: 10px;"><span class="pill__dot"></span>Saved</span></span><span class="num">1 420,46</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--pleasure" style="font-size: 10px;"><span class="pill__dot"></span>Pleasure</span></span><span class="num">1 420,46</span></div>
+                    </div>
+                  </div>
+                  <div class="hist-snap-card">
+                    <h5>Top expense categories</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Groceries <small>20 items</small></span><span class="num" style="color: var(--expense);">− 920,40</span></div>
+                      <div class="item"><span class="name">Eating out <small>14 items</small></span><span class="num" style="color: var(--expense);">− 612,80</span></div>
+                      <div class="item"><span class="name">Travel <small>3 items</small></span><span class="num" style="color: var(--expense);">− 480,00</span></div>
+                      <div class="item"><span class="name">Beauty &amp; care <small>5 items</small></span><span class="num" style="color: var(--expense);">− 312,00</span></div>
+                      <div class="item"><span class="name">Subscriptions <small>5 items</small></span><span class="num" style="color: var(--expense);">− 188,90</span></div>
+                      <div class="total"><span>Total spent</span><span class="num" style="color: var(--expense);">− 3 010,12</span></div>
+                    </div>
+                  </div>
+                  <div class="hist-snap-card">
+                    <h5>Account balances · end of March</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Cash</span><span class="num">410,00</span></div>
+                      <div class="item"><span class="name">mBank <small>daily life</small></span><span class="num">1 420,00</span></div>
+                      <div class="item"><span class="name">Revolut <small>pleasure</small></span><span class="num">1 010,00</span></div>
+                      <div class="item"><span class="name">mBank firmowe <small>business</small></span><span class="num">2 950,00</span></div>
+                      <div class="item"><span class="name">Lokata 6M <small>savings</small></span><span class="num">200,00</span></div>
+                      <div class="total"><span>Total assets</span><span class="num" style="color: var(--income);">5 990,00</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="hist-row" data-history-row="feb-2026">
+              <button class="hist-row__head" type="button" aria-expanded="false">
+                <span class="hist-row__label">February <span class="year">2026</span></span>
+                <span class="hist-row__stats">
+                  Spent <span class="num">3 412,80</span> · 58 items
+                  <span style="margin: 0 8px; color: var(--faint);">|</span>
+                  Saved <span class="num">700,00</span>
+                </span>
+                <span class="hist-row__pills">
+                  <span class="pill pill--daily"><span class="pill__dot"></span>40</span>
+                  <span class="pill pill--shared"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--saved"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--pleasure"><span class="pill__dot"></span>20</span>
+                </span>
+                <span class="hist-row__net">
+                  <span class="lbl">Net</span>
+                  <span class="num">6 802,15</span>
+                </span>
+                <span class="hist-row__caret" aria-hidden="true">›</span>
+              </button>
+              <div class="hist-row__expand">
+                <div class="hist-snapshot">
+                  <div class="hist-snap-card">
+                    <h5>Allocation snapshot</h5>
+                    <div class="donut-mini" style="background: conic-gradient(var(--cat-daily) 0% 40%, var(--cat-shared) 40% 60%, var(--cat-saved) 60% 80%, var(--cat-pleasure) 80% 100%);">
+                      <div class="center">
+                        <span class="num">6 802,15</span>
+                        <span class="lbl">Net · Feb</span>
+                      </div>
+                    </div>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name"><span class="pill pill--daily" style="font-size: 10px;"><span class="pill__dot"></span>Daily life</span></span><span class="num">2 720,86</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--shared" style="font-size: 10px;"><span class="pill__dot"></span>Shared</span></span><span class="num">1 360,43</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--saved" style="font-size: 10px;"><span class="pill__dot"></span>Saved</span></span><span class="num">1 360,43</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--pleasure" style="font-size: 10px;"><span class="pill__dot"></span>Pleasure</span></span><span class="num">1 360,43</span></div>
+                    </div>
+                  </div>
+                  <div class="hist-snap-card">
+                    <h5>Top expense categories</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Groceries <small>22 items</small></span><span class="num" style="color: var(--expense);">− 980,40</span></div>
+                      <div class="item"><span class="name">Eating out <small>11 items</small></span><span class="num" style="color: var(--expense);">− 540,30</span></div>
+                      <div class="item"><span class="name">Bills <small>5 items</small></span><span class="num" style="color: var(--expense);">− 720,00</span></div>
+                      <div class="item"><span class="name">Beauty &amp; care <small>4 items</small></span><span class="num" style="color: var(--expense);">− 220,00</span></div>
+                      <div class="item"><span class="name">Subscriptions <small>5 items</small></span><span class="num" style="color: var(--expense);">− 188,90</span></div>
+                      <div class="total"><span>Total spent</span><span class="num" style="color: var(--expense);">− 3 412,80</span></div>
+                    </div>
+                  </div>
+                  <div class="hist-snap-card">
+                    <h5>Account balances · end of February</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Cash</span><span class="num">350,00</span></div>
+                      <div class="item"><span class="name">mBank <small>daily life</small></span><span class="num">1 360,00</span></div>
+                      <div class="item"><span class="name">Revolut <small>pleasure</small></span><span class="num">820,00</span></div>
+                      <div class="item"><span class="name">mBank firmowe <small>business</small></span><span class="num">2 800,00</span></div>
+                      <div class="item"><span class="name">Lokata 6M <small>savings</small></span><span class="num">0,00</span></div>
+                      <div class="total"><span>Total assets</span><span class="num" style="color: var(--income);">5 330,00</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="hist-row" data-history-row="jan-2026">
+              <button class="hist-row__head" type="button" aria-expanded="false">
+                <span class="hist-row__label">January <span class="year">2026</span></span>
+                <span class="hist-row__stats">
+                  Spent <span class="num">3 612,98</span> · 51 items
+                  <span style="margin: 0 8px; color: var(--faint);">|</span>
+                  Saved <span class="num">650,00</span>
+                </span>
+                <span class="hist-row__pills">
+                  <span class="pill pill--daily"><span class="pill__dot"></span>40</span>
+                  <span class="pill pill--shared"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--saved"><span class="pill__dot"></span>20</span>
+                  <span class="pill pill--pleasure"><span class="pill__dot"></span>20</span>
+                </span>
+                <span class="hist-row__net">
+                  <span class="lbl">Net</span>
+                  <span class="num">6 978,49</span>
+                </span>
+                <span class="hist-row__caret" aria-hidden="true">›</span>
+              </button>
+              <div class="hist-row__expand">
+                <div class="hist-snapshot">
+                  <div class="hist-snap-card">
+                    <h5>Allocation snapshot</h5>
+                    <div class="donut-mini" style="background: conic-gradient(var(--cat-daily) 0% 40%, var(--cat-shared) 40% 60%, var(--cat-saved) 60% 80%, var(--cat-pleasure) 80% 100%);">
+                      <div class="center">
+                        <span class="num">6 978,49</span>
+                        <span class="lbl">Net · Jan</span>
+                      </div>
+                    </div>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name"><span class="pill pill--daily" style="font-size: 10px;"><span class="pill__dot"></span>Daily life</span></span><span class="num">2 791,40</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--shared" style="font-size: 10px;"><span class="pill__dot"></span>Shared</span></span><span class="num">1 395,70</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--saved" style="font-size: 10px;"><span class="pill__dot"></span>Saved</span></span><span class="num">1 395,70</span></div>
+                      <div class="item"><span class="name"><span class="pill pill--pleasure" style="font-size: 10px;"><span class="pill__dot"></span>Pleasure</span></span><span class="num">1 395,70</span></div>
+                    </div>
+                  </div>
+                  <div class="hist-snap-card">
+                    <h5>Top expense categories</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Groceries <small>18 items</small></span><span class="num" style="color: var(--expense);">− 1 042,30</span></div>
+                      <div class="item"><span class="name">Eating out <small>9 items</small></span><span class="num" style="color: var(--expense);">− 482,00</span></div>
+                      <div class="item"><span class="name">Bills <small>6 items</small></span><span class="num" style="color: var(--expense);">− 880,00</span></div>
+                      <div class="item"><span class="name">Travel <small>2 items</small></span><span class="num" style="color: var(--expense);">− 320,00</span></div>
+                      <div class="item"><span class="name">Subscriptions <small>5 items</small></span><span class="num" style="color: var(--expense);">− 188,90</span></div>
+                      <div class="total"><span>Total spent</span><span class="num" style="color: var(--expense);">− 3 612,98</span></div>
+                    </div>
+                  </div>
+                  <div class="hist-snap-card">
+                    <h5>Account balances · end of January</h5>
+                    <div class="hist-snap-list">
+                      <div class="item"><span class="name">Cash</span><span class="num">280,00</span></div>
+                      <div class="item"><span class="name">mBank <small>daily life</small></span><span class="num">1 510,00</span></div>
+                      <div class="item"><span class="name">Revolut <small>pleasure</small></span><span class="num">740,00</span></div>
+                      <div class="item"><span class="name">mBank firmowe <small>business</small></span><span class="num">2 700,00</span></div>
+                      <div class="item"><span class="name">Lokata 6M <small>savings</small></span><span class="num">0,00</span></div>
+                      <div class="total"><span>Total assets</span><span class="num" style="color: var(--income);">5 230,00</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+          </section>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+</div>
+
+<script>
+  // =======================================================================
+  // Screen routing
+  // =======================================================================
+  const SCREEN_TITLES = {
+    dashboard:  { caption: 'Dashboard',                    window: 'Florin — April 2026' },
+    income:     { caption: 'Income',                       window: 'Florin — Income · April 2026' },
+    expenses:   { caption: 'Expenses · list + detail',     window: 'Florin — Expenses · April 2026' },
+    savings:    { caption: 'Savings',                      window: 'Florin — Savings' },
+    cashflow:   { caption: 'Cash flow',                    window: 'Florin — Cash flow' },
+    history:    { caption: 'History',                      window: 'Florin — History' },
+    settings:   { caption: 'Settings',                     window: 'Florin — Settings' },
+    onboarding: { caption: 'Onboarding · Step 2 of 4',     window: 'Florin — Welcome' },
+  };
+
+  const captionEl = document.getElementById('screen-caption');
+  const windowTitleEl = document.getElementById('window-title');
+  const appBody = document.getElementById('app-body');
+
+  function showScreen(name) {
+    if (!SCREEN_TITLES[name]) return;
+    // Toggle screen content
+    document.querySelectorAll('[data-screen-content]').forEach(s => {
+      s.classList.toggle('is-active', s.dataset.screenContent === name);
+    });
+    // Update sidebar active state
+    document.querySelectorAll('.sidebar__nav a').forEach(a => {
+      a.classList.toggle('is-active', a.dataset.screen === name);
+    });
+    // Update titles
+    captionEl.textContent = SCREEN_TITLES[name].caption;
+    windowTitleEl.textContent = SCREEN_TITLES[name].window;
+    // Onboarding hides the sidebar
+    appBody.classList.toggle('onboarding-mode', name === 'onboarding');
+    // Persist
+    try { localStorage.setItem('florin.activeScreen', name); } catch (e) {}
+    // Scroll main back to top
+    document.querySelectorAll('.main, .settings-body').forEach(el => { el.scrollTop = 0; });
+  }
+
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-screen]');
+    if (!trigger) return;
+    e.preventDefault();
+    showScreen(trigger.dataset.screen);
+  });
+
+  // Restore last screen
+  try {
+    const saved = localStorage.getItem('florin.activeScreen');
+    if (saved && SCREEN_TITLES[saved]) showScreen(saved);
+  } catch (e) {}
+
+  // =======================================================================
+  // Onboarding — live category math
+  // =======================================================================
+  const NET_INCOME = 6960.98;
+  const formatPLN = (n) => n.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' PLN';
+
+  function recalcCategories() {
+    const sliders = document.querySelectorAll('.slider[data-cat-target]');
+    let total = 0;
+    sliders.forEach(s => total += Number(s.value));
+    const pctEl = document.getElementById('cat-total-pct');
+    const amtEl = document.getElementById('cat-total-amt');
+    if (!pctEl) return;
+
+    sliders.forEach(s => {
+      const cat = s.dataset.catTarget;
+      const pct = Number(s.value);
+      const amt = (NET_INCOME * pct) / 100;
+      const pctInput = document.querySelector(`[data-cat-pct="${cat}"]`);
+      const amtCell = document.querySelector(`[data-cat-amt="${cat}"]`);
+      if (pctInput) pctInput.value = pct + ' %';
+      if (amtCell) amtCell.textContent = formatPLN(amt);
+    });
+
+    pctEl.textContent = total + ' %';
+    pctEl.style.color = total === 100 ? 'var(--success)' : (total > 100 ? 'var(--error)' : 'var(--warning)');
+    amtEl.textContent = formatPLN((NET_INCOME * total) / 100);
+  }
+
+  document.querySelectorAll('.slider[data-cat-target]').forEach(s => {
+    s.addEventListener('input', recalcCategories);
+  });
+
+  // =======================================================================
+  // Expenses — selection
+  // =======================================================================
+  document.querySelectorAll('.exp-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.exp-item').forEach(x => x.classList.remove('is-selected'));
+      item.classList.add('is-selected');
+    });
+  });
+
+  // Filter pills (visual toggle only)
+  document.querySelectorAll('.pill--filter').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('.pill--filter').forEach(x => x.classList.remove('is-active'));
+      p.classList.add('is-active');
+    });
+  });
+
+  // Segmented controls
+  document.querySelectorAll('.segmented').forEach(seg => {
+    seg.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        seg.querySelectorAll('button').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+      });
+    });
+  });
+
+  // Theme cards
+  document.querySelectorAll('.theme-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('is-active'));
+      card.classList.add('is-active');
+    });
+  });
+
+  // Language cards
+  document.querySelectorAll('.lang-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.lang-card').forEach(c => c.classList.remove('is-active'));
+      card.classList.add('is-active');
+    });
+  });
+
+  // Settings sub-nav (scroll inside the .settings-body container)
+  document.querySelectorAll('.settings-nav a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const targetId = link.getAttribute('href');
+      if (targetId && targetId.startsWith('#')) {
+        const target = document.querySelector(targetId);
+        const scroller = document.querySelector('.settings-body');
+        if (target && scroller) {
+          e.preventDefault();
+          // offsetTop is relative to nearest positioned ancestor — settings-body's parent is .settings-page (static)
+          // Compute target offset within scroller manually
+          const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+          scroller.scrollTo({ top, behavior: 'smooth' });
+          document.querySelectorAll('.settings-nav a').forEach(a => a.classList.remove('is-active'));
+          link.classList.add('is-active');
+        }
+      }
+    });
+  });
+
+  // =======================================================================
+  // History — expand/collapse month rows (one open at a time)
+  // =======================================================================
+  document.querySelectorAll('.hist-row__head').forEach(head => {
+    head.addEventListener('click', () => {
+      const row = head.closest('.hist-row');
+      const wasOpen = row.classList.contains('is-expanded');
+      // Close every row first
+      document.querySelectorAll('.hist-row').forEach(r => {
+        r.classList.remove('is-expanded');
+        const h = r.querySelector('.hist-row__head');
+        if (h) h.setAttribute('aria-expanded', 'false');
+      });
+      // Toggle the clicked one (so a second click on an already-open row collapses it)
+      if (!wasOpen) {
+        row.classList.add('is-expanded');
+        head.setAttribute('aria-expanded', 'true');
+      }
+    });
+  });
+
+  // =======================================================================
+  // Savings — group expand/collapse (data-group-toggle ↔ data-group)
+  // =======================================================================
+  document.querySelectorAll('.sv-grid tr.is-group[data-group-toggle]').forEach(group => {
+    group.addEventListener('click', () => {
+      const id = group.dataset.groupToggle;
+      const isExpanded = group.dataset.expanded === 'true';
+      group.dataset.expanded = isExpanded ? 'false' : 'true';
+      // Toggle every child row that belongs to this group
+      const table = group.closest('table');
+      if (!table) return;
+      table.querySelectorAll(`tr[data-group="${id}"]`).forEach(child => {
+        child.classList.toggle('is-shown', !isExpanded);
+      });
+    });
+  });
+
+  // =======================================================================
+  // Year picker — active state + month switcher visual toggle
+  // =======================================================================
+  document.querySelectorAll('.year-picker').forEach(picker => {
+    picker.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Only buttons with text content (year labels) get the active state — skip ‹ ›
+        const isYear = /^\d{4}$/.test(btn.textContent.trim());
+        if (!isYear) return;
+        picker.querySelectorAll('button').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
