@@ -22,45 +22,45 @@ class EmergencyFundView(ctk.CTkFrame):
         title = ctk.CTkLabel(
             header_frame, 
             text=t("nav.emergency_fund"), 
-            font=theme.FONT_H1, 
-            text_color=theme.TEXT_PRIMARY
+            font=theme.FONT_DISPLAY, 
+            text_color=theme.COLOR_TEXT
         )
         title.pack(side="left")
         
         # Mode Switcher
-        mode_frame = ctk.CTkFrame(header_frame, fg_color=theme.SURFACE_COLOR, corner_radius=8)
+        mode_frame = ctk.CTkFrame(header_frame, fg_color=theme.COLOR_SURFACE, corner_radius=8)
         mode_frame.pack(side="right")
         
         self.btn_personal = ctk.CTkButton(
             mode_frame, text=tr_text("Personal (JA)"), width=120, height=32, corner_radius=8,
-            fg_color=theme.PRIMARY_COLOR, text_color=theme.SURFACE_COLOR, hover_color=theme.PRIMARY_HOVER,
+            fg_color=theme.COLOR_PRIMARY, text_color=theme.COLOR_SURFACE, hover_color=theme.COLOR_PRIMARY_HOVER,
             command=lambda: self.set_mode("personal")
         )
         self.btn_personal.pack(side="left", padx=2, pady=2)
         
         self.btn_shared = ctk.CTkButton(
             mode_frame, text=tr_text("Shared (WSPÓLNE)"), width=120, height=32, corner_radius=8,
-            fg_color="transparent", text_color=theme.TEXT_SECONDARY, hover_color=theme.HOVER_COLOR,
+            fg_color="transparent", text_color=theme.COLOR_TEXT_MUTED, hover_color=theme.COLOR_SURFACE_2,
             command=lambda: self.set_mode("shared")
         )
         self.btn_shared.pack(side="left", padx=2, pady=2)
         
         # Main Card
-        self.card = ctk.CTkFrame(self, fg_color=theme.SURFACE_COLOR, corner_radius=16, border_width=1, border_color=theme.BORDER_COLOR)
+        self.card = ctk.CTkFrame(self, fg_color=theme.COLOR_SURFACE, corner_radius=16, border_width=1, border_color=theme.COLOR_BORDER)
         self.card.pack(fill="both", expand=True, padx=40, pady=(0, 40))
         
         # Summary Header
-        self.goal_label = ctk.CTkLabel(self.card, text="", font=theme.FONT_H2, text_color=theme.TEXT_PRIMARY)
+        self.goal_label = ctk.CTkLabel(self.card, text="", font=theme.FONT_SECTION, text_color=theme.COLOR_TEXT)
         self.goal_label.pack(pady=(40, 10))
         
-        self.amount_label = ctk.CTkLabel(self.card, text="", font=ctk.CTkFont(family=theme.FONT_MONO[0], size=48, weight="bold"), text_color=theme.PRIMARY_COLOR)
+        self.amount_label = ctk.CTkLabel(self.card, text="", font=ctk.CTkFont(family=theme.FONT_MONO_FAMILY, size=48, weight="bold"), text_color=theme.COLOR_PRIMARY)
         self.amount_label.pack(pady=(0, 40))
         
         # Progress Bar
         self.progress_frame = ctk.CTkFrame(self.card, fg_color="transparent")
         self.progress_frame.pack(fill="x", padx=60, pady=20)
         
-        self.progress_bar = ctk.CTkProgressBar(self.progress_frame, height=24, corner_radius=12, progress_color=theme.PRIMARY_COLOR, fg_color=theme.BORDER_COLOR)
+        self.progress_bar = ctk.CTkProgressBar(self.progress_frame, height=24, corner_radius=12, progress_color=theme.COLOR_PRIMARY, fg_color=theme.COLOR_BORDER)
         self.progress_bar.pack(fill="x")
         self.progress_bar.set(0)
         
@@ -68,23 +68,23 @@ class EmergencyFundView(ctk.CTkFrame):
         stats_frame = ctk.CTkFrame(self.progress_frame, fg_color="transparent")
         stats_frame.pack(fill="x", pady=(10, 0))
         
-        self.actual_label = ctk.CTkLabel(stats_frame, text="", font=theme.FONT_BODY, text_color=theme.TEXT_SECONDARY)
+        self.actual_label = ctk.CTkLabel(stats_frame, text="", font=theme.FONT_BODY, text_color=theme.COLOR_TEXT_MUTED)
         self.actual_label.pack(side="left")
         
-        self.percent_label = ctk.CTkLabel(stats_frame, text="", font=theme.FONT_BODY_BOLD, text_color=theme.TEXT_PRIMARY)
+        self.percent_label = ctk.CTkLabel(stats_frame, text="", font=theme.FONT_LABEL, text_color=theme.COLOR_TEXT)
         self.percent_label.pack(side="right")
         
-        self.missing_label = ctk.CTkLabel(self.card, text="", font=theme.FONT_BODY, text_color=theme.EXPENSE_COLOR)
+        self.missing_label = ctk.CTkLabel(self.card, text="", font=theme.FONT_BODY, text_color=theme.COLOR_EXPENSE)
         self.missing_label.pack(pady=20)
 
     def set_mode(self, mode):
         self.mode_var.set(mode)
         if mode == "personal":
-            self.btn_personal.configure(fg_color=theme.PRIMARY_COLOR, text_color=theme.SURFACE_COLOR)
-            self.btn_shared.configure(fg_color="transparent", text_color=theme.TEXT_SECONDARY)
+            self.btn_personal.configure(fg_color=theme.COLOR_PRIMARY, text_color=theme.COLOR_SURFACE)
+            self.btn_shared.configure(fg_color="transparent", text_color=theme.COLOR_TEXT_MUTED)
         else:
-            self.btn_shared.configure(fg_color=theme.PRIMARY_COLOR, text_color=theme.SURFACE_COLOR)
-            self.btn_personal.configure(fg_color="transparent", text_color=theme.TEXT_SECONDARY)
+            self.btn_shared.configure(fg_color=theme.COLOR_PRIMARY, text_color=theme.COLOR_SURFACE)
+            self.btn_personal.configure(fg_color="transparent", text_color=theme.COLOR_TEXT_MUTED)
         self.refresh()
 
     def calculate_target(self, mode_data):
