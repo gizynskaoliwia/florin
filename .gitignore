@@ -14,6 +14,8 @@ logo2.ico
 __pycache__/
 *.pyc
 *.pyo
+.venv/
+.playwright-mcp/
 
 # Data files (personal monthly data)
 data/
