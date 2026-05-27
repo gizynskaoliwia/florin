@@ -3408,6 +3408,7 @@ class SettingsView(ctk.CTkFrame):
             ("Categories", "settings.nav.categories"),
             ("Appearance", "settings.nav.appearance"),
             ("Language", "settings.nav.language"),
+            ("Features", "nav.shared_goals"),
             ("Data & backup", "settings.nav.data"),
         ]
         for i, (section_key, label_key) in enumerate(sections):
@@ -3548,6 +3549,26 @@ class SettingsView(ctk.CTkFrame):
             ctk.CTkLabel(copy, text=subtitle, font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(anchor="w")
             ctk.CTkButton(card, text=t("common.active") if current_lang == code else t("common.use"), width=74, height=30, fg_color=COLOR_PRIMARY if current_lang == code else COLOR_SURFACE_2, text_color=COLOR_SURFACE if current_lang == code else COLOR_TEXT, hover_color=COLOR_PRIMARY_SOFT, command=lambda lang=code: self.set_language_pref(lang)).pack(side="right", padx=16, pady=16)
             self.language_cards[code] = card
+
+        # === Features ===
+        feat_card = make_card(self.scroll)
+        feat_card.pack(fill="x", pady=(0, 24))
+        self.section_widgets["Features"] = feat_card
+        self._settings_section_header(feat_card, "Features", "Enable experimental or extra features.")
+        
+        self.shared_goals_var = ctk.StringVar(value=self.controller.config.get("enable_shared_goals", "false"))
+        sw = ctk.CTkSwitch(
+            feat_card,
+            text=t("settings.enable_shared_goals"),
+            variable=self.shared_goals_var,
+            onvalue="true",
+            offvalue="false",
+            command=self.toggle_shared_goals,
+            font=FONT_BODY,
+            fg_color=COLOR_BORDER,
+            progress_color=COLOR_PRIMARY
+        )
+        sw.pack(anchor="w", padx=24, pady=(16, 24))
 
         # === Data & backup ===
         data_card = make_card(self.scroll)
