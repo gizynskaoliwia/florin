@@ -50,7 +50,66 @@ def close():
 
 def _init_schema(conn: sqlite3.Connection):
     """Create all tables if they don't exist."""
+    cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='emergency_fund_transactions'")
+    transactions_table_exists = cur.fetchone() is not None
+
     conn.executescript(SCHEMA_SQL)
+    
+    # Check if allocations column exists, if not, add it
+    cur = conn.execute("PRAGMA table_info(emergency_fund_settings)")
+    columns = [col["name"] for col in cur.fetchall()]
+    if "allocations" not in columns:
+        conn.execute("ALTER TABLE emergency_fund_settings ADD COLUMN allocations TEXT NOT NULL DEFAULT '{\"80% CELU OBLIGACJE\": 80.0, \"20% CELU KONTO OSZCZ.\": 20.0}'")
+    if "manual_target" not in columns:
+        conn.execute("ALTER TABLE emergency_fund_settings ADD COLUMN manual_target REAL DEFAULT NULL")
+
+    if not transactions_table_exists:
+        import uuid
+        from datetime import datetime
+        rows = conn.execute("SELECT mode, actual_saved FROM emergency_fund_settings").fetchall()
+        today = datetime.now().strftime("%Y-%m-%d")
+        for row in rows:
+            mode = row["mode"]
+            amount = row["actual_saved"]
+            if amount > 0:
+                conn.execute(
+                    "INSERT INTO emergency_fund_transactions (id, mode, date, type, amount, created_at) VALUES (?, ?, ?, 'deposit', ?, datetime('now'))",
+                    (str(uuid.uuid4()), mode, today, amount)
+                )
+
+    # Migrate emergency_fund_transactions to snapshot model
+    cur = conn.execute("PRAGMA table_info(emergency_fund_transactions)")
+    columns = [col["name"] for col in cur.fetchall()]
+    if columns and "note" not in columns:
+        import uuid
+        from datetime import datetime
+        
+        # We must drop the CHECK constraint, so we recreate the table
+        conn.execute("""
+            CREATE TABLE emergency_fund_transactions_new (
+                id TEXT PRIMARY KEY,
+                mode TEXT NOT NULL,
+                date TEXT NOT NULL,
+                type TEXT NOT NULL,
+                amount REAL NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("INSERT INTO emergency_fund_transactions_new (id, mode, date, type, amount, created_at) SELECT id, mode, date, type, amount, created_at FROM emergency_fund_transactions")
+        conn.execute("DROP TABLE emergency_fund_transactions")
+        conn.execute("ALTER TABLE emergency_fund_transactions_new RENAME TO emergency_fund_transactions")
+        
+        # Inject current actual_saved as a snapshot to not lose the balance!
+        rows = conn.execute("SELECT mode, actual_saved FROM emergency_fund_settings").fetchall()
+        today = datetime.now().strftime("%Y-%m-%d")
+        for row in rows:
+            mode = row["mode"]
+            amount = row["actual_saved"]
+            conn.execute(
+                "INSERT INTO emergency_fund_transactions (id, mode, date, type, amount, note, created_at) VALUES (?, ?, ?, 'snapshot', ?, 'Migrated balance snapshot', datetime('now'))",
+                (str(uuid.uuid4()), mode, today, amount)
+            )
 
 
 SCHEMA_SQL = """
@@ -215,14 +274,28 @@ CREATE TABLE IF NOT EXISTS shared_goals_data (
     PRIMARY KEY (goal_id, month_key, person_id)
 );
 
--- Emergency fund settings (Personal and Shared)
 CREATE TABLE IF NOT EXISTS emergency_fund_settings (
     mode TEXT PRIMARY KEY,
     salary REAL NOT NULL DEFAULT 0.0,
     mortgage REAL NOT NULL DEFAULT 0.0,
     living_expenses REAL NOT NULL DEFAULT 0.0,
     selected_goal TEXT NOT NULL DEFAULT '3msc_zycia',
-    actual_saved REAL NOT NULL DEFAULT 0.0
+    actual_saved REAL NOT NULL DEFAULT 0.0,
+    future_goal TEXT NOT NULL DEFAULT '6msc_zycia',
+    cash_allocated REAL NOT NULL DEFAULT 0.0,
+    allocations TEXT NOT NULL DEFAULT '{"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0}',
+    manual_target REAL DEFAULT NULL
+);
+
+-- Emergency fund transactions
+CREATE TABLE IF NOT EXISTS emergency_fund_transactions (
+    id TEXT PRIMARY KEY,
+    mode TEXT NOT NULL,
+    date TEXT NOT NULL,
+    type TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Migration tracking

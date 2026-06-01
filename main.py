@@ -822,7 +822,7 @@ class IncomeView(ctk.CTkFrame):
     def add_item(self, item_type):
         dialog = ctk.CTkToplevel(self)
         dialog.title(tx("Add Addition" if item_type == "addition" else "Add Deduction"))
-        dialog.geometry("400x320")
+        dialog.geometry("420x450" if item_type == "addition" else "420x320")
         dialog.transient(self.winfo_toplevel())
         dialog.grab_set()
         
@@ -834,13 +834,48 @@ class IncomeView(ctk.CTkFrame):
         amt_entry = ctk.CTkEntry(dialog)
         amt_entry.pack(fill="x", padx=20)
         
+        alloc_mode_var = ctk.StringVar(value=ui_text("Proportional", "Proporcjonalnie"))
+        cat_var = ctk.StringVar()
+        
+        if item_type == "addition":
+            ctk.CTkLabel(dialog, text=ui_text("Allocation:", "Alokacja:"), anchor="w").pack(fill="x", padx=20, pady=(10, 5))
+            
+            alloc_options = [ui_text("Proportional", "Proporcjonalnie"), ui_text("Direct to Category", "Przypisz do jednej kategorii")]
+            alloc_menu = ctk.CTkOptionMenu(dialog, values=alloc_options, variable=alloc_mode_var)
+            alloc_menu.pack(fill="x", padx=20)
+            
+            cat_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+            
+            ctk.CTkLabel(cat_frame, text=tx("Target Category:"), anchor="w").pack(fill="x", pady=(10, 5))
+            cats = self.controller.data.get("categories", [])
+            cat_names = [display_category_name(c) for c in cats]
+            if cat_names:
+                cat_var.set(cat_names[0])
+            cat_menu = ctk.CTkOptionMenu(cat_frame, values=cat_names, variable=cat_var)
+            cat_menu.pack(fill="x")
+            
+            def on_alloc_change(val):
+                if val == ui_text("Direct to Category", "Przypisz do jednej kategorii"):
+                    cat_frame.pack(fill="x", padx=20)
+                else:
+                    cat_frame.pack_forget()
+                    
+            alloc_menu.configure(command=on_alloc_change)
+            on_alloc_change(alloc_mode_var.get())
+        
         def save():
             try:
                 amt = float(amt_entry.get().replace(",", "."))
                 name = name_entry.get().strip()
                 if not name or amt <= 0:
                     return
-                item = {"id": dm.generate_id(), "name": name, "amount": amt, "type": item_type, "category_id": None}
+                cat_id = None
+                if item_type == "addition" and alloc_mode_var.get() == ui_text("Direct to Category", "Przypisz do jednej kategorii"):
+                    matched = next((c for c in self.controller.data.get("categories", []) if display_category_name(c) == cat_var.get()), None)
+                    if matched:
+                        cat_id = matched["id"]
+                        
+                item = {"id": dm.generate_id(), "name": name, "amount": amt, "type": item_type, "category_id": cat_id}
                 self.controller.data.setdefault("income_items", []).append(item)
                 self.controller.save_data()
                 dialog.destroy()
@@ -854,9 +889,10 @@ class IncomeView(ctk.CTkFrame):
         item = next((i for i in self.controller.data.get("income_items", []) if i["id"] == item_id), None)
         if not item:
             return
+        item_type = item.get("type", "addition")
         dialog = ctk.CTkToplevel(self)
         dialog.title(tx("Edit Item"))
-        dialog.geometry("400x320")
+        dialog.geometry("420x450" if item_type == "addition" else "420x320")
         dialog.transient(self.winfo_toplevel())
         dialog.grab_set()
         
@@ -870,14 +906,62 @@ class IncomeView(ctk.CTkFrame):
         amt_entry.insert(0, str(item["amount"]))
         amt_entry.pack(fill="x", padx=20)
         
+        alloc_mode_var = ctk.StringVar(value=ui_text("Proportional", "Proporcjonalnie"))
+        cat_var = ctk.StringVar()
+        
+        if item_type == "addition":
+            ctk.CTkLabel(dialog, text=ui_text("Allocation:", "Alokacja:"), anchor="w").pack(fill="x", padx=20, pady=(10, 5))
+            
+            alloc_options = [ui_text("Proportional", "Proporcjonalnie"), ui_text("Direct to Category", "Przypisz do jednej kategorii")]
+            
+            # Default state
+            if item.get("category_id"):
+                alloc_mode_var.set(ui_text("Direct to Category", "Przypisz do jednej kategorii"))
+            
+            alloc_menu = ctk.CTkOptionMenu(dialog, values=alloc_options, variable=alloc_mode_var)
+            alloc_menu.pack(fill="x", padx=20)
+            
+            cat_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+            
+            ctk.CTkLabel(cat_frame, text=tx("Target Category:"), anchor="w").pack(fill="x", pady=(10, 5))
+            cats = self.controller.data.get("categories", [])
+            cat_names = [display_category_name(c) for c in cats]
+            if cat_names:
+                cat_var.set(cat_names[0])
+                
+            # Pre-select actual category if exists
+            if item.get("category_id"):
+                matched = next((c for c in cats if c["id"] == item["category_id"]), None)
+                if matched:
+                    cat_var.set(display_category_name(matched))
+            
+            cat_menu = ctk.CTkOptionMenu(cat_frame, values=cat_names, variable=cat_var)
+            cat_menu.pack(fill="x")
+            
+            def on_alloc_change(val):
+                if val == ui_text("Direct to Category", "Przypisz do jednej kategorii"):
+                    cat_frame.pack(fill="x", padx=20)
+                else:
+                    cat_frame.pack_forget()
+                    
+            alloc_menu.configure(command=on_alloc_change)
+            on_alloc_change(alloc_mode_var.get())
+        
         def save():
             try:
                 amt = float(amt_entry.get().replace(",", "."))
                 name = name_entry.get().strip()
                 if not name or amt <= 0:
                     return
+                cat_id = None
+                if item_type == "addition" and alloc_mode_var.get() == ui_text("Direct to Category", "Przypisz do jednej kategorii"):
+                    matched = next((c for c in self.controller.data.get("categories", []) if display_category_name(c) == cat_var.get()), None)
+                    if matched:
+                        cat_id = matched["id"]
+                        
                 item["name"] = name
                 item["amount"] = amt
+                item["category_id"] = cat_id
                 self.controller.save_data()
                 dialog.destroy()
                 self.refresh()
@@ -1126,9 +1210,8 @@ class ExpensesView(ctk.CTkFrame):
         self.controller = controller
 
         # Month filter state
-        now = datetime.now()
-        self.filter_month = now.month
-        self.filter_year = now.year
+        self.filter_month = None
+        self.filter_year = None
         self.active_tag = None
         self.active_source_id = None
         self.group_mode = "date"
@@ -1144,10 +1227,10 @@ class ExpensesView(ctk.CTkFrame):
         ctk.CTkButton(self.topbar, text=t("expenses.manage_categories"), width=154, height=34, fg_color=COLOR_SURFACE, text_color=COLOR_TEXT, hover_color=COLOR_SURFACE_2, border_width=1, border_color=COLOR_BORDER, corner_radius=RADIUS_BUTTON, command=self.open_category_manager).pack(side="right", padx=8)
         month_box = ctk.CTkFrame(self.topbar, fg_color=COLOR_SURFACE, corner_radius=RADIUS_BUTTON, border_width=1, border_color=COLOR_BORDER)
         month_box.pack(side="right", padx=8)
-        ctk.CTkButton(month_box, text="‹", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=self._prev_month).pack(side="left", padx=(4, 0), pady=3)
+        ctk.CTkButton(month_box, text="‹", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(-1)).pack(side="left", padx=(4, 0), pady=3)
         self._month_label = ctk.CTkLabel(month_box, text="", font=FONT_MONO, text_color=COLOR_TEXT, width=116)
         self._month_label.pack(side="left")
-        ctk.CTkButton(month_box, text="›", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=self._next_month).pack(side="left", padx=(0, 4), pady=3)
+        ctk.CTkButton(month_box, text="›", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(1)).pack(side="left", padx=(0, 4), pady=3)
         ctk.CTkFrame(self, height=1, fg_color=COLOR_BORDER).pack(fill="x")
 
         self.filter_bar = make_card(self)
@@ -1256,14 +1339,18 @@ class ExpensesView(ctk.CTkFrame):
         source_names = sorted(source_options.keys(), key=str.casefold)
         if not source_names:
             source_names = [tx("(none)")]
-        source_var = ctk.StringVar(value=source_names[0])
+        default_source = source_names[0] if source_names else tx("(none)")
         if edit_exp:
             if edit_exp.get("savings_category_id"):
-                cur_sav = next((f"{tx('Goal')}: {display_name(c['name'])}" for c in sav_cats if c["id"] == edit_exp["savings_category_id"]), source_names[0])
-                source_var.set(cur_sav)
+                default_source = next((f"{tx('Goal')}: {display_name(c['name'])}" for c in sav_cats if c["id"] == edit_exp["savings_category_id"]), default_source)
             else:
-                cur_split = next((f"{tx('Budget')}: {display_category_name(c)}" for c in split_cats if c["id"] == edit_exp.get("category_id")), source_names[0])
-                source_var.set(cur_split)
+                default_source = next((f"{tx('Budget')}: {display_category_name(c)}" for c in split_cats if c["id"] == edit_exp.get("category_id")), default_source)
+        elif self.active_source_id:
+            found = next((f"{tx('Budget')}: {display_category_name(c)}" for c in split_cats if c["id"] == self.active_source_id), None)
+            if found:
+                default_source = found
+
+        source_var = ctk.StringVar(value=default_source)
         ctk.CTkOptionMenu(dialog, values=source_names, variable=source_var).pack(fill="x", padx=20)
 
         ctk.CTkLabel(dialog, text=tx("Description (optional):"), anchor="w").pack(fill="x", padx=20, pady=(10, 3))
@@ -1305,6 +1392,30 @@ class ExpensesView(ctk.CTkFrame):
                 split_id = source_id
             elif source_kind == "goal":
                 savings_cat_id = source_id
+
+            # Check if moving to a different month
+            new_date = datetime.strptime(date_val, "%d/%m/%Y")
+            new_month_str = f"{new_date.year}-{new_date.month:02d}"
+
+            if new_month_str != self.controller.current_month:
+                if edit_exp:
+                    dm.delete_expense(data, edit_exp["id"])
+                self.controller.save_data()
+                
+                other_data = dm.load_month(new_month_str)
+                exp = dm.add_expense(other_data, date_val, amt, split_id, expense_category_id=exp_cat_id, description=desc, tags=tags)
+                exp["savings_category_id"] = savings_cat_id
+                if edit_exp:
+                    exp["id"] = edit_exp["id"]
+                dm.save_month(new_month_str, other_data)
+                
+                self.controller.current_month = new_month_str
+                self.controller.config["last_month"] = new_month_str
+                dm.save_config(self.controller.config)
+                self.controller.data = other_data
+                dialog.destroy()
+                self.controller.show_view("Expenses")
+                return
 
             if edit_exp:
                 dm.edit_expense(data, edit_exp["id"], date=date_val, amount=amt, expense_category_id=exp_cat_id, category_id=split_id, savings_category_id=savings_cat_id, description=desc, tags=tags)
@@ -1407,23 +1518,6 @@ class ExpensesView(ctk.CTkFrame):
         self.group_mode = mode
         self.refresh()
 
-    # --- Month navigation ---
-    def _prev_month(self):
-        if self.filter_month == 1:
-            self.filter_month = 12
-            self.filter_year -= 1
-        else:
-            self.filter_month -= 1
-        self.refresh()
-
-    def _next_month(self):
-        if self.filter_month == 12:
-            self.filter_month = 1
-            self.filter_year += 1
-        else:
-            self.filter_month += 1
-        self.refresh()
-
     # --- Delete expense ---
     def delete_expense(self, exp_id):
         dm.delete_expense(self.controller.data, exp_id)
@@ -1435,6 +1529,10 @@ class ExpensesView(ctk.CTkFrame):
         data = self.controller.data
         if "expense_categories" not in data:
             data["expense_categories"] = list(dm.DEFAULT_EXPENSE_CATEGORIES)
+
+        year_str, month_str = self.controller.current_month.split("-")
+        self.filter_year = int(year_str)
+        self.filter_month = int(month_str)
 
         self._month_label.configure(text=f"{month_full(self.filter_month).upper()} {self.filter_year}")
         filtered_expenses = self._visible_expenses()
@@ -1669,6 +1767,9 @@ class ExpensesView(ctk.CTkFrame):
         top = ctk.CTkFrame(head, fg_color="transparent")
         top.pack(fill="x", padx=24, pady=(20, 0))
         ctk.CTkLabel(top, text=f"●  {tx('EXPENSE DETAIL')}", font=FONT_LABEL, text_color=COLOR_PRIMARY).pack(side="left")
+        
+        ctk.CTkButton(top, text=f"✎ {tx('Edit')}", width=60, height=24, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, font=FONT_SMALL, corner_radius=4, command=lambda e=exp: self.open_add_expense(edit_exp=e)).pack(side="right", padx=(10, 0))
+        
         d = self._date_key(exp)
         ctk.CTkLabel(top, text=f"{tx('Edited')} · {d.day:02d} {month_abbr(d.month)}", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="right")
         ctk.CTkLabel(head, text=exp.get("description") or self._expense_category_name(exp), font=FONT_DETAIL_TITLE, text_color=COLOR_TEXT).pack(anchor="w", padx=24, pady=(8, 0))
@@ -1683,6 +1784,12 @@ class ExpensesView(ctk.CTkFrame):
             pill.pack(side="left")
         ctk.CTkLabel(meta_row, text=f"{self._expense_category_name(exp)} {tx('subcategory')}", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="left", padx=10)
 
+        foot = ctk.CTkFrame(self.detail_card, fg_color=COLOR_SURFACE_2, corner_radius=0)
+        foot.pack(side="bottom", fill="x")
+        ctk.CTkButton(foot, text=tx("Delete"), fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_EXPENSE_SOFT, command=lambda eid=exp["id"]: self.delete_expense(eid)).pack(side="left", padx=24, pady=16)
+        ctk.CTkButton(foot, text=tx("Edit"), height=32, fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER, command=lambda e=exp: self.open_add_expense(edit_exp=e)).pack(side="right", padx=(6, 24), pady=16)
+        ctk.CTkButton(foot, text=tx("Cancel"), height=32, fg_color=COLOR_SURFACE, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, border_width=1, border_color=COLOR_BORDER, command=self.refresh).pack(side="right", padx=6, pady=16)
+
         body = ctk.CTkFrame(self.detail_card, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=24, pady=20)
         self._detail_field(body, tx("Date"), exp.get("date", ""), mono=True)
@@ -1693,12 +1800,6 @@ class ExpensesView(ctk.CTkFrame):
         if exp.get("tags"):
             self._detail_field(body, tx("Tags"), ", ".join(exp["tags"]))
         self._budget_breakdown(body, exp, source_cat)
-
-        foot = ctk.CTkFrame(self.detail_card, fg_color=COLOR_SURFACE_2, corner_radius=0)
-        foot.pack(side="bottom", fill="x")
-        ctk.CTkButton(foot, text=tx("Delete"), fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_EXPENSE_SOFT, command=lambda eid=exp["id"]: self.delete_expense(eid)).pack(side="left", padx=24, pady=16)
-        ctk.CTkButton(foot, text=tx("Save changes"), height=32, fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER, command=lambda e=exp: self.open_add_expense(edit_exp=e)).pack(side="right", padx=(6, 24), pady=16)
-        ctk.CTkButton(foot, text=tx("Cancel"), height=32, fg_color=COLOR_SURFACE, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, border_width=1, border_color=COLOR_BORDER, command=self.refresh).pack(side="right", padx=6, pady=16)
 
     def _detail_field(self, parent, label, value, mono=False):
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -3582,20 +3683,7 @@ class SettingsView(ctk.CTkFrame):
             progress_color=COLOR_PRIMARY
         )
         sw.pack(anchor="w", padx=24, pady=(16, 24))
-        
-        self.emergency_fund_var = ctk.StringVar(value=self.controller.config.get("enable_emergency_fund", "false"))
-        sw2 = ctk.CTkSwitch(
-            feat_card,
-            text=t("settings.enable_emergency_fund"),
-            variable=self.emergency_fund_var,
-            onvalue="true",
-            offvalue="false",
-            command=self.toggle_emergency_fund,
-            font=FONT_BODY,
-            fg_color=COLOR_BORDER,
-            progress_color=COLOR_PRIMARY
-        )
-        sw2.pack(anchor="w", padx=24, pady=(0, 24))
+
 
         # === Emergency Fund Settings ===
         ef_card = make_card(self.scroll)
@@ -3603,36 +3691,54 @@ class SettingsView(ctk.CTkFrame):
         self.section_widgets["Emergency Fund Settings"] = ef_card
         self._settings_section_header(ef_card, t("Emergency Fund Settings"), "")
         
-        self.ef_mode_var = ctk.StringVar(value="personal")
-        self.ef_salary_var = ctk.StringVar(value="0.0")
-        self.ef_mortgage_var = ctk.StringVar(value="0.0")
-        self.ef_living_var = ctk.StringVar(value="0.0")
-        self.ef_actual_var = ctk.StringVar(value="0.0")
-        self.ef_goal_var = ctk.StringVar(value="3msc_zycia")
+        self.emergency_fund_var = ctk.StringVar(value=self.controller.config.get("enable_emergency_fund", "false"))
+        self.ef_personal_var = ctk.StringVar(value=self.controller.config.get("enable_ef_personal", "true"))
+        self.ef_shared_var = ctk.StringVar(value=self.controller.config.get("enable_ef_shared", "false"))
+
+        self.editing_ef = False
+        self.p_allocations = []
+        self.s_allocations = []
+
+        # Personal Vars
+        self.ef_p_salary_var = ctk.StringVar(value="0.0")
+        self.ef_p_mortgage_var = ctk.StringVar(value="0.0")
+        self.ef_p_living_var = ctk.StringVar(value="0.0")
+        self.ef_p_actual_var = ctk.StringVar(value="0.0")
+        self.ef_p_goal_var = ctk.StringVar(value="3msc_zycia_kredytu")
+        self.ef_p_future_goal_var = ctk.StringVar(value="6msc_kredytu")
+
+        # Shared Vars
+        self.ef_s_salary_var = ctk.StringVar(value="0.0")
+        self.ef_s_mortgage_var = ctk.StringVar(value="0.0")
+        self.ef_s_living_var = ctk.StringVar(value="0.0")
+        self.ef_s_actual_var = ctk.StringVar(value="0.0")
+        self.ef_s_goal_var = ctk.StringVar(value="3msc_zycia_kredytu")
+        self.ef_s_future_goal_var = ctk.StringVar(value="6msc_kredytu")
+
+        self.ef_body = ctk.CTkFrame(ef_card, fg_color="transparent")
+        self.ef_body.pack(fill="x", padx=24, pady=(0, 24))
+
+        # Toggles
+        toggles_frame = ctk.CTkFrame(self.ef_body, fg_color="transparent")
+        toggles_frame.pack(fill="x", pady=(0, 15))
         
-        ef_body = ctk.CTkFrame(ef_card, fg_color="transparent")
-        ef_body.pack(fill="x", padx=24, pady=(0, 24))
-        
-        # Mode selector
-        mode_frame = ctk.CTkFrame(ef_body, fg_color="transparent")
-        mode_frame.pack(fill="x", pady=5)
-        ctk.CTkLabel(mode_frame, text=t("Mode:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
-        ctk.CTkOptionMenu(mode_frame, variable=self.ef_mode_var, values=["personal", "shared"], command=self.load_ef_settings).pack(side="left")
-        
-        # Inputs
-        self._ef_input(ef_body, t("Salary (Wypłata)"), self.ef_salary_var)
-        self._ef_input(ef_body, t("Mortgage/Loan (Kredyt)"), self.ef_mortgage_var)
-        self._ef_input(ef_body, t("Living Expenses (Do życia)"), self.ef_living_var)
-        self._ef_input(ef_body, t("Actual Saved:"), self.ef_actual_var)
-        
-        # Goal dropdown
-        goal_frame = ctk.CTkFrame(ef_body, fg_color="transparent")
-        goal_frame.pack(fill="x", pady=5)
-        ctk.CTkLabel(goal_frame, text=t("Goal:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
-        ctk.CTkOptionMenu(goal_frame, variable=self.ef_goal_var, values=["3msc_zycia", "6msc_zycia", "3msc_kredytu", "6msc_kredytu", "3msc_zycia_kredytu", "6msc_zycia_kredytu", "3msc_wyplaty", "6msc_wyplaty"]).pack(side="left")
-        
-        ctk.CTkButton(ef_body, text=t("Save changes"), command=self.save_ef_settings, fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER).pack(pady=15)
-        self.load_ef_settings("personal")
+        ctk.CTkSwitch(
+            toggles_frame, text=t("Enable Emergency Fund Globally"), variable=self.emergency_fund_var,
+            onvalue="true", offvalue="false", command=self.toggle_emergency_fund, font=FONT_TITLE,
+            fg_color=COLOR_BORDER, progress_color=COLOR_PRIMARY
+        ).pack(anchor="w", pady=(0, 15))
+
+        sub_frame = ctk.CTkFrame(toggles_frame, fg_color="transparent")
+        sub_frame.pack(fill="x")
+        ctk.CTkCheckBox(sub_frame, text=t("Enable Personal Fund (JA)"), variable=self.ef_personal_var, onvalue="true", offvalue="false", command=self.toggle_ef_sub, fg_color=COLOR_PRIMARY).pack(side="left", padx=(0, 20))
+        ctk.CTkCheckBox(sub_frame, text=t("Enable Shared Fund (WSPÓLNE)"), variable=self.ef_shared_var, onvalue="true", offvalue="false", command=self.toggle_ef_sub, fg_color=COLOR_PRIMARY).pack(side="left")
+
+        self.ef_forms_container = ctk.CTkFrame(self.ef_body, fg_color="transparent")
+        self.ef_forms_container.pack(fill="x")
+
+        self.load_ef_settings()
+        self.render_ef_forms()
+
 
         # === Data & backup ===
         data_card = make_card(self.scroll)
@@ -3848,26 +3954,169 @@ class SettingsView(ctk.CTkFrame):
         ctk.CTkLabel(row, text=label_text, font=FONT_TITLE, width=150, anchor="w").pack(side="left")
         ctk.CTkEntry(row, textvariable=var, font=FONT_MONO, width=150).pack(side="left")
 
-    def load_ef_settings(self, mode):
+    def _ef_label(self, parent, label_text, val_text):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=5)
+        ctk.CTkLabel(row, text=label_text, font=FONT_TITLE, width=150, anchor="w").pack(side="left")
+        ctk.CTkLabel(row, text=val_text, font=FONT_MONO).pack(side="left")
+
+    def toggle_ef_sub(self):
+        self.controller.config["enable_ef_personal"] = self.ef_personal_var.get()
+        self.controller.config["enable_ef_shared"] = self.ef_shared_var.get()
+        dm.save_config(self.controller.config)
+        self.render_ef_forms()
+        self.controller.refresh_sidebar()
+
+    def toggle_edit_ef(self):
+        self.editing_ef = True
+        self.render_ef_forms()
+
+    def save_and_toggle_ef(self):
+        self.save_ef_settings()
+        self.editing_ef = False
+        self.render_ef_forms()
+
+    def add_allocation(self, alloc_list):
+        alloc_list.append({"name": ctk.StringVar(value="Nowa kategoria"), "pct": ctk.StringVar(value="0")})
+        self.render_ef_forms()
+
+    def remove_allocation(self, alloc_list, item):
+        alloc_list.remove(item)
+        self.render_ef_forms()
+
+    def render_ef_forms(self):
+        for w in self.ef_forms_container.winfo_children():
+            w.destroy()
+
+        if self.emergency_fund_var.get() != "true":
+            return
+
+        goal_options = [
+            "3msc_kredytu", "3msc_zycia", "6msc_kredytu",
+            "3msc_zycia_kredytu", "4msc_zycia_kredytu", "5msc_zycia_kredytu", "6msc_zycia_kredytu",
+            "3msc_wyplaty", "6msc_wyplaty"
+        ]
+
+        def _build_form(parent, title, s_var, m_var, l_var, a_var, g_var, f_var, alloc_list):
+            f = ctk.CTkFrame(parent, fg_color="transparent")
+            f.pack(fill="x", pady=(10, 20))
+            
+            hdr = ctk.CTkFrame(f, fg_color="transparent")
+            hdr.pack(fill="x", pady=(0, 10))
+            ctk.CTkLabel(hdr, text=title, font=FONT_SECTION, text_color=COLOR_PRIMARY).pack(side="left")
+            
+            if not self.editing_ef:
+                ctk.CTkButton(hdr, text=t("Edit"), width=60, height=28, fg_color=COLOR_SURFACE, text_color=COLOR_TEXT, border_width=1, border_color=COLOR_BORDER, hover_color=COLOR_SURFACE_2, command=self.toggle_edit_ef).pack(side="right")
+                
+                self._ef_label(f, t("Salary (Wypłata)"), f"{float(s_var.get()):,.2f} PLN")
+                self._ef_label(f, t("Mortgage/Loan (Kredyt)"), f"{float(m_var.get()):,.2f} PLN")
+                self._ef_label(f, t("Living Expenses (Do życia)"), f"{float(l_var.get()):,.2f} PLN")
+                self._ef_label(f, t("Actual Saved:"), f"{float(a_var.get()):,.2f} PLN")
+                self._ef_label(f, t("Active Goal:"), g_var.get())
+                self._ef_label(f, t("Future Goal:"), f_var.get())
+                
+                ctk.CTkLabel(f, text=t("Asset Allocations"), font=FONT_TITLE, text_color=COLOR_TEXT_MUTED).pack(anchor="w", pady=(15, 5))
+                for al in alloc_list:
+                    r = ctk.CTkFrame(f, fg_color="transparent")
+                    r.pack(fill="x", pady=2)
+                    ctk.CTkLabel(r, text=f"• {al['name'].get()}:", font=FONT_BODY, width=150, anchor="w").pack(side="left")
+                    ctk.CTkLabel(r, text=f"{al['pct'].get()}%", font=FONT_MONO).pack(side="left")
+            else:
+                ctk.CTkButton(hdr, text=t("Save"), width=60, height=28, fg_color=COLOR_SUCCESS, text_color=COLOR_SURFACE, hover_color=COLOR_MET_PLAN, command=self.save_and_toggle_ef).pack(side="right")
+                
+                self._ef_input(f, t("Salary (Wypłata)"), s_var)
+                self._ef_input(f, t("Mortgage/Loan (Kredyt)"), m_var)
+                self._ef_input(f, t("Living Expenses (Do życia)"), l_var)
+                self._ef_input(f, t("Actual Saved:"), a_var)
+                
+                gf = ctk.CTkFrame(f, fg_color="transparent")
+                gf.pack(fill="x", pady=5)
+                ctk.CTkLabel(gf, text=t("Active Goal:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
+                ctk.CTkOptionMenu(gf, variable=g_var, values=goal_options).pack(side="left")
+                
+                ff = ctk.CTkFrame(f, fg_color="transparent")
+                ff.pack(fill="x", pady=5)
+                ctk.CTkLabel(ff, text=t("Future Goal:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
+                ctk.CTkOptionMenu(ff, variable=f_var, values=goal_options).pack(side="left")
+                
+                ctk.CTkLabel(f, text=t("Asset Allocations (%)"), font=FONT_TITLE, text_color=COLOR_TEXT_MUTED).pack(anchor="w", pady=(15, 5))
+                for al in alloc_list:
+                    r = ctk.CTkFrame(f, fg_color="transparent")
+                    r.pack(fill="x", pady=2)
+                    ctk.CTkEntry(r, textvariable=al["name"], width=200).pack(side="left", padx=5)
+                    ctk.CTkEntry(r, textvariable=al["pct"], width=60).pack(side="left")
+                    ctk.CTkLabel(r, text="%").pack(side="left", padx=5)
+                    ctk.CTkButton(r, text="×", width=28, fg_color="transparent", text_color=COLOR_ERROR, command=lambda a=al, lst=alloc_list: self.remove_allocation(lst, a)).pack(side="left")
+                
+                ctk.CTkButton(f, text="+ Add Allocation", width=120, height=28, fg_color="transparent", text_color=COLOR_PRIMARY, border_width=1, border_color=COLOR_PRIMARY, command=lambda lst=alloc_list: self.add_allocation(lst)).pack(anchor="w", pady=(5, 10), padx=5)
+
+        if self.ef_personal_var.get() == "true":
+            _build_form(self.ef_forms_container, t("Personal Settings (JA)"), self.ef_p_salary_var, self.ef_p_mortgage_var, self.ef_p_living_var, self.ef_p_actual_var, self.ef_p_goal_var, self.ef_p_future_goal_var, self.p_allocations)
+            
+        if self.ef_shared_var.get() == "true":
+            _build_form(self.ef_forms_container, t("Shared Settings (WSPÓLNE)"), self.ef_s_salary_var, self.ef_s_mortgage_var, self.ef_s_living_var, self.ef_s_actual_var, self.ef_s_goal_var, self.ef_s_future_goal_var, self.s_allocations)
+
+    def load_ef_settings(self):
         settings = dm.get_emergency_fund_settings()
-        data = settings.get(mode, {})
-        self.ef_salary_var.set(str(data.get("salary", 0.0)))
-        self.ef_mortgage_var.set(str(data.get("mortgage", 0.0)))
-        self.ef_living_var.set(str(data.get("living_expenses", 0.0)))
-        self.ef_actual_var.set(str(data.get("actual_saved", 0.0)))
-        self.ef_goal_var.set(data.get("selected_goal", "3msc_zycia"))
+        
+        p_data = settings.get("personal", {})
+        self.ef_p_salary_var.set(str(p_data.get("salary", 0.0)))
+        self.ef_p_mortgage_var.set(str(p_data.get("mortgage", 0.0)))
+        self.ef_p_living_var.set(str(p_data.get("living_expenses", 0.0)))
+        self.ef_p_actual_var.set(str(p_data.get("actual_saved", 0.0)))
+        self.ef_p_goal_var.set(p_data.get("selected_goal", "3msc_zycia_kredytu"))
+        self.ef_p_future_goal_var.set(p_data.get("future_goal", "6msc_zycia"))
+        self.p_allocations = [{"name": ctk.StringVar(value=k), "pct": ctk.StringVar(value=str(v))} for k, v in p_data.get("allocations", {}).items()]
+
+        s_data = settings.get("shared", {})
+        self.ef_s_salary_var.set(str(s_data.get("salary", 0.0)))
+        self.ef_s_mortgage_var.set(str(s_data.get("mortgage", 0.0)))
+        self.ef_s_living_var.set(str(s_data.get("living_expenses", 0.0)))
+        self.ef_s_actual_var.set(str(s_data.get("actual_saved", 0.0)))
+        self.ef_s_goal_var.set(s_data.get("selected_goal", "3msc_zycia_kredytu"))
+        self.ef_s_future_goal_var.set(s_data.get("future_goal", "6msc_zycia"))
+        self.s_allocations = [{"name": ctk.StringVar(value=k), "pct": ctk.StringVar(value=str(v))} for k, v in s_data.get("allocations", {}).items()]
 
     def save_ef_settings(self):
-        mode = self.ef_mode_var.get()
         try:
-            data = {
-                "salary": float(self.ef_salary_var.get().replace(",", ".")),
-                "mortgage": float(self.ef_mortgage_var.get().replace(",", ".")),
-                "living_expenses": float(self.ef_living_var.get().replace(",", ".")),
-                "actual_saved": float(self.ef_actual_var.get().replace(",", ".")),
-                "selected_goal": self.ef_goal_var.get()
+            p_old = dm.get_emergency_fund_settings().get("personal", {})
+            p_allocs = {}
+            for a in self.p_allocations:
+                try:
+                    p_allocs[a["name"].get()] = float(a["pct"].get().replace(",", "."))
+                except: pass
+
+            p_data = {
+                "salary": float(self.ef_p_salary_var.get().replace(",", ".")),
+                "mortgage": float(self.ef_p_mortgage_var.get().replace(",", ".")),
+                "living_expenses": float(self.ef_p_living_var.get().replace(",", ".")),
+                "actual_saved": float(self.ef_p_actual_var.get().replace(",", ".")),
+                "selected_goal": self.ef_p_goal_var.get(),
+                "future_goal": self.ef_p_future_goal_var.get(),
+                "cash_allocated": p_old.get("cash_allocated", 0.0),
+                "allocations": p_allocs
             }
-            dm.save_emergency_fund_settings(mode, data)
+            dm.save_emergency_fund_settings("personal", p_data)
+
+            s_old = dm.get_emergency_fund_settings().get("shared", {})
+            s_allocs = {}
+            for a in self.s_allocations:
+                try:
+                    s_allocs[a["name"].get()] = float(a["pct"].get().replace(",", "."))
+                except: pass
+
+            s_data = {
+                "salary": float(self.ef_s_salary_var.get().replace(",", ".")),
+                "mortgage": float(self.ef_s_mortgage_var.get().replace(",", ".")),
+                "living_expenses": float(self.ef_s_living_var.get().replace(",", ".")),
+                "actual_saved": float(self.ef_s_actual_var.get().replace(",", ".")),
+                "selected_goal": self.ef_s_goal_var.get(),
+                "future_goal": self.ef_s_future_goal_var.get(),
+                "cash_allocated": s_old.get("cash_allocated", 0.0),
+                "allocations": s_allocs
+            }
+            dm.save_emergency_fund_settings("shared", s_data)
+
             if "Emergency Fund" in self.controller.views:
                 self.controller.views["Emergency Fund"].refresh()
         except ValueError:

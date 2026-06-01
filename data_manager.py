@@ -39,11 +39,14 @@ def set_setting(key, value):
 def get_config():
     """Return config dict compatible with old API."""
     conn = get_connection()
-    config = {
-        "last_month": get_setting("last_month", datetime.now().strftime("%Y-%m")),
-        "theme": get_setting("theme", "light"),
-        "language": get_setting("language", "en"),
-    }
+    rows = conn.execute("SELECT key, value FROM settings").fetchall()
+    config = {r["key"]: r["value"] for r in rows}
+    
+    # Defaults if missing
+    if "last_month" not in config: config["last_month"] = datetime.now().strftime("%Y-%m")
+    if "theme" not in config: config["theme"] = "light"
+    if "language" not in config: config["language"] = "en"
+    
     config["cashflow_targets"] = get_cashflow_targets()
     config["default_income_items"] = get_default_income_items()
     return config
@@ -51,9 +54,11 @@ def get_config():
 
 def save_config(config):
     """Persist config dict (compatibility shim)."""
-    for key in ("last_month", "theme", "language"):
-        if key in config:
-            set_setting(key, config[key])
+    for key, value in config.items():
+        if key in ("cashflow_targets", "default_income_items"):
+            continue
+        if isinstance(value, (str, int, float, bool)):
+            set_setting(key, str(value))
     if "cashflow_targets" in config:
         conn = get_connection()
         conn.execute("DELETE FROM cashflow_targets")
@@ -853,31 +858,75 @@ def get_emergency_fund_settings():
     for mode in ["personal", "shared"]:
         row = conn.execute("SELECT * FROM emergency_fund_settings WHERE mode = ?", (mode,)).fetchone()
         if not row:
-            conn.execute(
-                "INSERT INTO emergency_fund_settings (mode, salary, mortgage, living_expenses, selected_goal, actual_saved) VALUES (?, 0.0, 0.0, 0.0, '3msc_zycia', 0.0)",
-                (mode,)
-            )
+            if mode == "personal":
+                conn.execute(
+                    "INSERT INTO emergency_fund_settings (mode, salary, mortgage, living_expenses, selected_goal, actual_saved, future_goal, cash_allocated, allocations) VALUES (?, 10000.0, 2750.0, 3900.0, '3msc_zycia_kredytu', 17946.71, '4msc_zycia_kredytu', 1950.0, ?)",
+                    (mode, json.dumps({"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0}))
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO emergency_fund_settings (mode, salary, mortgage, living_expenses, selected_goal, actual_saved, future_goal, cash_allocated, allocations) VALUES (?, 20000.0, 5500.0, 5600.0, '3msc_zycia_kredytu', 17946.71, '6msc_kredytu', 1950.0, ?)",
+                    (mode, json.dumps({"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0}))
+                )
             conn.commit()
             
     rows = conn.execute("SELECT * FROM emergency_fund_settings").fetchall()
     res = {}
     for r in rows:
+        try:
+            allocations = json.loads(r["allocations"])
+        except (ValueError, KeyError, TypeError):
+            allocations = {"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0}
+            
         res[r["mode"]] = {
             "salary": r["salary"],
             "mortgage": r["mortgage"],
             "living_expenses": r["living_expenses"],
             "selected_goal": r["selected_goal"],
-            "actual_saved": r["actual_saved"]
+            "actual_saved": r["actual_saved"],
+            "future_goal": r["future_goal"],
+            "cash_allocated": r["cash_allocated"],
+            "allocations": allocations,
+            "manual_target": r["manual_target"] if "manual_target" in r.keys() else None
         }
     return res
 
 def save_emergency_fund_settings(mode, data):
     conn = get_connection()
+    allocs = data.get("allocations", {"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0})
     conn.execute(
         """UPDATE emergency_fund_settings 
-           SET salary = ?, mortgage = ?, living_expenses = ?, selected_goal = ?, actual_saved = ?
+           SET salary = ?, mortgage = ?, living_expenses = ?, selected_goal = ?, actual_saved = ?, future_goal = ?, cash_allocated = ?, allocations = ?, manual_target = ?
            WHERE mode = ?""",
-        (data.get("salary", 0.0), data.get("mortgage", 0.0), data.get("living_expenses", 0.0), 
-         data.get("selected_goal", "3msc_zycia"), data.get("actual_saved", 0.0), mode)
+        (data["salary"], data["mortgage"], data["living_expenses"], data["selected_goal"], data["actual_saved"], data.get("future_goal", "6msc_zycia"), data.get("cash_allocated", 0.0), json.dumps(allocs), data.get("manual_target"), mode)
     )
+    conn.commit()
+
+def get_emergency_fund_transactions(mode):
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT id, date, type, amount, note FROM emergency_fund_transactions WHERE mode = ? ORDER BY date DESC, created_at DESC",
+        (mode,)
+    ).fetchall()
+    return [{"id": r["id"], "date": r["date"], "type": r["type"], "amount": r["amount"], "note": r["note"]} for r in rows]
+
+def _recalculate_emergency_fund_actual(conn, mode):
+    row = conn.execute("SELECT amount FROM emergency_fund_transactions WHERE mode = ? AND type = 'snapshot' ORDER BY date DESC, created_at DESC LIMIT 1", (mode,)).fetchone()
+    total = row["amount"] if row else 0.0
+    conn.execute("UPDATE emergency_fund_settings SET actual_saved = ? WHERE mode = ?", (total, mode))
+    return total
+
+def add_emergency_fund_transaction(mode, date, t_type, amount, note=""):
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO emergency_fund_transactions (id, mode, date, type, amount, note) VALUES (?, ?, ?, ?, ?, ?)",
+        (generate_id(), mode, date, t_type, amount, note)
+    )
+    _recalculate_emergency_fund_actual(conn, mode)
+    conn.commit()
+
+def delete_emergency_fund_transaction(transaction_id, mode):
+    conn = get_connection()
+    conn.execute("DELETE FROM emergency_fund_transactions WHERE id = ?", (transaction_id,))
+    _recalculate_emergency_fund_actual(conn, mode)
     conn.commit()
