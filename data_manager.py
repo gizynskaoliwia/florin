@@ -419,23 +419,26 @@ def save_savings_planner(sp):
             conn.execute("INSERT INTO savings_assumed (month_key, amount) VALUES (?, ?)", (mk, amt))
 
     # Actual grid
-    conn.execute("DELETE FROM savings_actual_grid")
-    for cat_id, months in sp.get("actual_grid", {}).items():
-        for mk, amt in months.items():
-            if amt:
-                conn.execute("INSERT INTO savings_actual_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
+    if "actual_grid" in sp:
+        conn.execute("DELETE FROM savings_actual_grid")
+        for cat_id, months in sp["actual_grid"].items():
+            for mk, amt in months.items():
+                if amt:
+                    conn.execute("INSERT INTO savings_actual_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
 
     # Actual available
-    conn.execute("DELETE FROM savings_actual_available")
-    for mk, amt in sp.get("actual_available", {}).items():
-        if amt:
-            conn.execute("INSERT INTO savings_actual_available (month_key, amount) VALUES (?, ?)", (mk, amt))
+    if "actual_available" in sp:
+        conn.execute("DELETE FROM savings_actual_available")
+        for mk, amt in sp["actual_available"].items():
+            if amt:
+                conn.execute("INSERT INTO savings_actual_available (month_key, amount) VALUES (?, ?)", (mk, amt))
 
     # Spent
-    conn.execute("DELETE FROM savings_spent")
-    for cat_id, amt in sp.get("spent", {}).items():
-        if amt:
-            conn.execute("INSERT INTO savings_spent (category_id, amount) VALUES (?, ?)", (cat_id, amt))
+    if "spent" in sp:
+        conn.execute("DELETE FROM savings_spent")
+        for cat_id, amt in sp["spent"].items():
+            if amt:
+                conn.execute("INSERT INTO savings_spent (category_id, amount) VALUES (?, ?)", (cat_id, amt))
 
     conn.commit()
 
@@ -472,8 +475,7 @@ def add_savings_category(sp, name, target, deadline_month=12, group_id=None, nex
     monthly = round(target / months_count, 2) if months_count > 0 else 0
     grid_row = {f"{m:02d}": monthly if m <= deadline_month else 0.0 for m in range(1, 13)}
     if next_year_target and deadline_month < 12:
-        remaining_months = 12 - deadline_month
-        monthly_nyt = round(next_year_target / remaining_months, 2)
+        monthly_nyt = round(next_year_target / 12, 2)
         for m in range(deadline_month + 1, 13):
             grid_row[f"{m:02d}"] = monthly_nyt
     sp["grid"][cat["id"]] = grid_row
@@ -488,9 +490,39 @@ def edit_savings_category(sp, cat_id, **fields):
     return None
 
 
+def get_cat_missing(sp, cat_id, spent_cache=None):
+    target = 0
+    for cat in sp.get("categories", []):
+        if cat["id"] == cat_id:
+            target = cat.get("target", 0)
+            break
+    saved = get_cat_saved_until_deadline(sp, cat_id)
+    return max(0, target - saved)
+
+
+def can_delete_savings_category(sp, cat_id):
+    """Check if category can be deleted safely."""
+    # Check if any actual savings are accumulated
+    actual_row = sp.get("actual_grid", {}).get(cat_id, {})
+    if any(amt > 0 for amt in actual_row.values()):
+        return False, "Kategoria zawiera już odłożone pieniądze (Rzeczywiste oszczędności). Przenieś je przed usunięciem."
+        
+    # Check if there are any expenses tied to this category
+    conn = get_connection()
+    count = conn.execute("SELECT COUNT(*) FROM expenses WHERE savings_category_id = ?", (cat_id,)).fetchone()[0]
+    if count > 0:
+        return False, f"Z tą kategorią powiązane są wydatki ({count}). Zmień przypisanie tych wydatków przed usunięciem."
+        
+    return True, ""
+
+
 def delete_savings_category(sp, cat_id):
+    can_delete, err = can_delete_savings_category(sp, cat_id)
+    if not can_delete:
+        raise ValueError(err)
     sp["categories"] = [c for c in sp["categories"] if c["id"] != cat_id]
     sp["grid"].pop(cat_id, None)
+    sp.get("actual_grid", {}).pop(cat_id, None)
 
 
 def add_savings_group(sp, name):
@@ -530,8 +562,10 @@ def get_month_remaining(sp, month_key):
 
 def get_actual_month_total(sp, month_key):
     total = 0.0
+    active_cat_ids = {c["id"] for c in sp.get("categories", [])}
     for cat_id, months in sp.get("actual_grid", {}).items():
-        total += months.get(month_key, 0.0)
+        if cat_id in active_cat_ids:
+            total += months.get(month_key, 0.0)
     return total
 
 
@@ -544,46 +578,78 @@ def get_cat_total_saved(sp, cat_id):
     return sum(sp.get("actual_grid", {}).get(cat_id, {}).values())
 
 
-def get_cat_missing(sp, cat_id):
+def get_cat_saved_until_deadline(sp, cat_id):
     cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
-    if not cat:
-        return 0.0
-    return max(0.0, cat["target"] - get_cat_total_saved(sp, cat_id))
+    deadline = cat.get("deadline_month", 12) if cat else 12
+    return sum(v for k, v in sp.get("actual_grid", {}).get(cat_id, {}).items() if int(k) <= deadline)
+
+
+def get_cat_saved_after_deadline(sp, cat_id):
+    cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    deadline = cat.get("deadline_month", 12) if cat else 12
+    return sum(v for k, v in sp.get("actual_grid", {}).get(cat_id, {}).items() if int(k) > deadline)
 
 
 def get_cat_progress(sp, cat_id):
     cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
     if not cat or cat["target"] <= 0:
         return 0.0
-    return min(1.0, get_cat_total_saved(sp, cat_id) / cat["target"])
+    return min(1.0, get_cat_saved_until_deadline(sp, cat_id) / cat["target"])
 
 
-def get_cat_balance(sp, cat_id, monthly_data=None):
+def get_cat_balance(sp, cat_id, monthly_data=None, spent_cache=None):
     saved = get_cat_total_saved(sp, cat_id)
-    if monthly_data:
+    if spent_cache is not None:
+        spent = spent_cache.get(cat_id, {}).get("total", 0.0) if isinstance(spent_cache.get(cat_id), dict) else spent_cache.get(cat_id, 0.0)
+    elif monthly_data:
         spent = get_savings_spent(monthly_data, cat_id)
     else:
-        spent = sp.get("spent", {}).get(cat_id, 0.0)
+        spent = _get_all_months_savings_spent(cat_id)
     return saved - spent
 
 
-def get_cat_rollover(sp, cat_id, monthly_data=None):
+def get_cat_rollover(sp, cat_id, monthly_data=None, spent_cache=None):
     cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
     if not cat or not cat.get("next_year_target"):
         return 0.0
-    balance = get_cat_balance(sp, cat_id, monthly_data)
+    balance = get_cat_balance(sp, cat_id, monthly_data, spent_cache)
     if balance > 0 and get_cat_progress(sp, cat_id) >= 1.0:
         return balance
     return 0.0
 
 
-def build_savings_spent_cache():
-    """Single query to get total spent per savings category across all months."""
+def build_savings_spent_cache(sp=None):
+    """Single query to get total spent per savings category, split by deadline."""
     conn = get_connection()
+    # Deduplicate by ID to ensure bulletproof aggregation
     rows = conn.execute(
-        "SELECT savings_category_id, SUM(amount) as total FROM expenses WHERE savings_category_id IS NOT NULL GROUP BY savings_category_id"
+        """
+        SELECT id, savings_category_id, month, MAX(amount) as amount
+        FROM expenses
+        WHERE savings_category_id IS NOT NULL
+        GROUP BY id, savings_category_id, month
+        """
     ).fetchall()
-    return {r["savings_category_id"]: r["total"] for r in rows}
+    
+    cat_deadlines = {c["id"]: c.get("deadline_month", 12) for c in sp.get("categories", [])} if sp else {}
+    cache = {}
+    for r in rows:
+        cat_id = r["savings_category_id"]
+        amt = r["amount"]
+        try:
+            exp_m = int(r["month"].split("-")[1])
+        except:
+            exp_m = 12
+        deadline = cat_deadlines.get(cat_id, 12)
+        
+        if cat_id not in cache:
+            cache[cat_id] = {"total": 0.0, "until_deadline": 0.0}
+        
+        cache[cat_id]["total"] += amt
+        if exp_m <= deadline:
+            cache[cat_id]["until_deadline"] += amt
+            
+    return cache
 
 
 def get_cascade_adjustments(sp, cat_id, spent_cache=None):
@@ -598,7 +664,13 @@ def get_cascade_adjustments(sp, cat_id, spent_cache=None):
         return {}
     actual_row = sp.get("actual_grid", {}).get(cat_id, {})
     total_saved = sum(actual_row.get(f"{m:02d}", 0.0) for m in range(1, deadline + 1))
-    total_spent = spent_cache.get(cat_id, 0.0) if spent_cache is not None else _get_all_months_savings_spent(cat_id)
+    
+    if spent_cache is not None:
+        raw_spent = spent_cache.get(cat_id, 0.0)
+        total_spent = raw_spent.get("total", 0.0) if isinstance(raw_spent, dict) else raw_spent
+    else:
+        total_spent = _get_all_months_savings_spent(cat_id)
+        
     if total_spent <= 0:
         return {}
     surplus = total_saved - total_spent

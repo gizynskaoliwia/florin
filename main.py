@@ -1365,12 +1365,17 @@ class ExpensesView(ctk.CTkFrame):
         if edit_exp:
             tags_entry.insert(0, ", ".join(edit_exp.get("tags", [])))
 
+        save_btn = ctk.CTkButton(dialog, text=tx("Save"))
+        
         def save():
+            save_btn.configure(state="disabled")
             try:
                 amt = float(amt_entry.get().replace(",", "."))
                 if amt <= 0:
+                    save_btn.configure(state="normal")
                     return
             except:
+                save_btn.configure(state="normal")
                 return
             date_val = date_entry.get().strip()
             try:
@@ -1378,6 +1383,7 @@ class ExpensesView(ctk.CTkFrame):
                 date_error_lbl.configure(text="")
             except ValueError:
                 date_error_lbl.configure(text=tx("Invalid date. Use DD/MM/YYYY format."))
+                save_btn.configure(state="normal")
                 return
             exp_cats_current = dm.get_expense_categories(data)
             exp_cat_id = next((c["id"] for c in exp_cats_current if display_name(c["name"]) == exp_cat_var.get()), None)
@@ -1426,7 +1432,8 @@ class ExpensesView(ctk.CTkFrame):
             dialog.destroy()
             self.refresh()
 
-        ctk.CTkButton(dialog, text=tx("Save"), command=save).pack(fill="x", padx=20, pady=15)
+        save_btn.configure(command=save)
+        save_btn.pack(fill="x", padx=20, pady=15)
 
     def _on_exp_cat_select(self, val, exp_cat_var, exp_cat_menu, parent_dialog, data):
         create_marker = tx("+ Create new category...")
@@ -2013,7 +2020,7 @@ class SavingsView(ctk.CTkFrame):
                 # Redistribute if deadline changed and next_year_target set
                 if nyt and deadline < 12:
                     grid_row = self.sp.get("grid", {}).get(cat["id"], {})
-                    monthly_nyt = round(nyt / (12 - deadline), 2)
+                    monthly_nyt = round(nyt / 12, 2)
                     for m in range(deadline + 1, 13):
                         grid_row[f"{m:02d}"] = monthly_nyt
             else:
@@ -2022,14 +2029,33 @@ class SavingsView(ctk.CTkFrame):
                 if nyt and deadline < 12:
                     new_cat = self.sp["categories"][-1]
                     grid_row = self.sp["grid"][new_cat["id"]]
-                    monthly_nyt = round(nyt / (12 - deadline), 2)
+                    monthly_nyt = round(nyt / 12, 2)
                     for m in range(deadline + 1, 13):
                         grid_row[f"{m:02d}"] = monthly_nyt
             dm.save_savings_planner(self.sp)
             dialog.destroy()
             self._rebuild_ui()
 
-        ctk.CTkButton(dialog, text=tx("Save"), command=save).pack(fill="x", padx=20, pady=15)
+        def delete_cat():
+            if not messagebox.askyesno(tx("Confirm Delete"), ui_text(f"Are you sure you want to delete category '{cat['name']}'?", f"Czy na pewno chcesz usunąć kategorię '{cat['name']}'?")):
+                return
+            try:
+                dm.delete_savings_category(self.sp, cat["id"])
+                dm.save_savings_planner(self.sp)
+                dialog.destroy()
+                self._rebuild_ui()
+            except ValueError as e:
+                messagebox.showerror(ui_text("Cannot delete", "Nie można usunąć"), str(e))
+
+        btns = ctk.CTkFrame(dialog, fg_color="transparent")
+        btns.pack(fill="x", padx=20, pady=15)
+        
+        save_btn = ctk.CTkButton(btns, text=tx("Save"), command=save)
+        save_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
+        
+        if cat:
+            del_btn = ctk.CTkButton(btns, text=tx("Delete"), fg_color=COLOR_EXPENSE, hover_color="#A94442", command=delete_cat)
+            del_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
     def add_category_dialog(self):
         self.open_category_editor(cat=None)
@@ -2043,9 +2069,43 @@ class SavingsView(ctk.CTkFrame):
             self._rebuild_ui()
 
     def delete_category(self, cat_id):
-        dm.delete_savings_category(self.sp, cat_id)
+        cat = next((c for c in self.sp["categories"] if c["id"] == cat_id), None)
+        if not cat: return
+        if not messagebox.askyesno(tx("Confirm Delete"), ui_text(f"Are you sure you want to delete category '{cat['name']}'?", f"Czy na pewno chcesz usunąć kategorię '{cat['name']}'?")):
+            return
+        try:
+            dm.delete_savings_category(self.sp, cat_id)
+            dm.save_savings_planner(self.sp)
+            self._rebuild_ui()
+        except ValueError as e:
+            messagebox.showerror(ui_text("Cannot delete", "Nie można usunąć"), str(e))
+
+    def delete_group(self, group_id):
+        group = next((g for g in self.sp.get("groups", []) if g["id"] == group_id), None)
+        if not group: return
+        
+        children = [c for c in self.sp.get("categories", []) if c.get("group_id") == group_id]
+        if children:
+            if not messagebox.askyesno(tx("Confirm Delete"), ui_text(
+                f"Group '{group['name']}' contains {len(children)} categories. They will be detached and moved to Ungrouped. Continue?",
+                f"Grupa '{group['name']}' zawiera kategorie ({len(children)}). Zostaną one odpięte i przeniesione do Niezgrupowanych. Kontynuować?"
+            )):
+                return
+        else:
+            if not messagebox.askyesno(tx("Confirm Delete"), ui_text(f"Are you sure you want to delete group '{group['name']}'?", f"Czy na pewno chcesz usunąć grupę '{group['name']}'?")):
+                return
+                
+        dm.delete_savings_group(self.sp, group_id)
         dm.save_savings_planner(self.sp)
         self._rebuild_ui()
+
+    def edit_group_dialog(self, group):
+        d = ctk.CTkInputDialog(text=tx("Enter new group name:"), title=tx("Edit Group"))
+        name = d.get_input()
+        if name and name.strip() and name.strip() != group["name"]:
+            dm.edit_savings_group(self.sp, group["id"], name.strip())
+            dm.save_savings_planner(self.sp)
+            self._rebuild_ui()
 
     def on_cell_change(self, cat_id, month_key, var):
         try:
@@ -2218,9 +2278,18 @@ class SavingsView(ctk.CTkFrame):
         def render_group_row(group, r):
             collapsed = group["id"] in self.planning_collapsed
             chevron = "▶" if collapsed else "▼"
-            lbl = ctk.CTkLabel(table, text=f"{chevron} {group['name']}", font=FONT_LABEL, text_color=COLOR_PRIMARY, width=NAME_W, anchor="w", cursor="hand2")
-            lbl.grid(row=r, column=0, padx=2, pady=(6, 1), sticky="w")
+            
+            name_frame = ctk.CTkFrame(table, fg_color="transparent")
+            name_frame.grid(row=r, column=0, padx=2, pady=(6, 1), sticky="w")
+            
+            lbl = ctk.CTkLabel(name_frame, text=f"{chevron} {group['name']}", font=FONT_LABEL, text_color=COLOR_PRIMARY, width=NAME_W-40, anchor="w", cursor="hand2")
+            lbl.pack(side="left")
             lbl.bind("<Button-1>", lambda e, gid=group["id"]: self.toggle_planning_group(gid))
+            
+            if self.editing:
+                ctk.CTkButton(name_frame, text="✎", width=20, height=20, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=lambda g=group: self.edit_group_dialog(g)).pack(side="right", padx=1)
+                ctk.CTkButton(name_frame, text="×", width=20, height=20, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda gid=group["id"]: self.delete_group(gid)).pack(side="right")
+
             self.planning_group_labels[group["id"]] = lbl
             children = grouped_cats.get(group["id"], [])
             # Use pre-computed cascade adjustments for each child
@@ -2398,11 +2467,13 @@ class SavingsView(ctk.CTkFrame):
                     bg = "transparent"
                 ctk.CTkLabel(table, text=txt, font=FONT_SMALL, text_color=color, width=COL_W, anchor="center", fg_color=bg, corner_radius=4).grid(row=r, column=m+1, padx=1, pady=1)
 
-        saved = dm.get_cat_total_saved(sp, cat["id"])
+        saved = dm.get_cat_saved_until_deadline(sp, cat["id"])
         missing = dm.get_cat_missing(sp, cat["id"])
         progress = dm.get_cat_progress(sp, cat["id"])
-        spent = dm.get_savings_spent(data, cat["id"])
-        balance = saved - spent
+        spent = self._spent_cache.get(cat["id"], {}).get("total", 0.0)
+        spent_until_deadline = self._spent_cache.get(cat["id"], {}).get("until_deadline", 0.0)
+        balance_deadline = saved - spent_until_deadline
+        post_deadline = dm.get_cat_saved_after_deadline(sp, cat["id"])
 
         s_lbl = ctk.CTkLabel(table, text=f"{saved:,.0f}", font=FONT_SMALL, text_color=COLOR_TEXT, width=55, anchor="center")
         s_lbl.grid(row=r, column=13, padx=1, pady=1)
@@ -2412,9 +2483,12 @@ class SavingsView(ctk.CTkFrame):
         p_lbl.grid(row=r, column=15, padx=1, pady=1)
         sp_lbl = ctk.CTkLabel(table, text=f"{spent:,.0f}" if spent else "–", font=FONT_SMALL, text_color=COLOR_EXPENSE, width=55, anchor="center")
         sp_lbl.grid(row=r, column=16, padx=1, pady=1)
-        b_lbl = ctk.CTkLabel(table, text=f"{balance:,.0f}", font=FONT_SMALL, text_color=COLOR_SUCCESS if balance >= 0 else COLOR_ERROR, width=55, anchor="center")
-        b_lbl.grid(row=r, column=17, padx=1, pady=1)
-        self.actual_summary_lbls[cat["id"]] = {"saved": s_lbl, "missing": m_lbl, "progress": p_lbl, "balance": b_lbl}
+        bd_lbl = ctk.CTkLabel(table, text=f"{balance_deadline:,.0f}", font=FONT_SMALL, text_color=COLOR_SUCCESS if balance_deadline >= 0 else COLOR_ERROR, width=55, anchor="center")
+        bd_lbl.grid(row=r, column=17, padx=1, pady=1)
+        pd_lbl = ctk.CTkLabel(table, text=f"{post_deadline:,.0f}" if post_deadline else "–", font=FONT_SMALL, text_color=COLOR_TEXT, width=55, anchor="center")
+        pd_lbl.grid(row=r, column=18, padx=1, pady=1)
+        
+        self.actual_summary_lbls[cat["id"]] = {"saved": s_lbl, "missing": m_lbl, "progress": p_lbl, "balance": bd_lbl}
 
     def build_actual_table(self):
         """Render actual savings tracker table (top section)."""
@@ -2432,7 +2506,7 @@ class SavingsView(ctk.CTkFrame):
         head.pack(fill="x", padx=20, pady=(18, 12))
         ctk.CTkLabel(head, text=tx("Actual Savings"), font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
         ctk.CTkLabel(head, text=ui_text("what's already in each pot", "ile realnie jest w każdym celu"), font=FONT_MONO_SM_BOLD, text_color=COLOR_TEXT_MUTED).pack(side="left", padx=10)
-        ctk.CTkLabel(head, text=ui_text("months · saved · missing · % · spent · balance", "miesiące · odłożono · brakuje · % · wydano · saldo"), font=FONT_MONO_SM_BOLD, text_color=COLOR_TEXT_MUTED).pack(side="right")
+        ctk.CTkLabel(head, text=ui_text("months · saved · missing · % · spent · balance deadline · post deadline", "miesiące · odłożono · brakuje · % · wydano · saldo do deadline · po deadline"), font=FONT_MONO_SM_BOLD, text_color=COLOR_TEXT_MUTED).pack(side="right")
         ctk.CTkFrame(card, height=1, fg_color=COLOR_BORDER).pack(fill="x")
         table = ctk.CTkFrame(card, fg_color="transparent")
         table.pack(anchor="nw", padx=14, pady=14)
@@ -2447,7 +2521,7 @@ class SavingsView(ctk.CTkFrame):
             hdr_bg = COLOR_CURRENT_MONTH if is_current else "transparent"
             hdr_color = COLOR_PRIMARY if is_current else COLOR_TEXT_MUTED
             ctk.CTkLabel(table, text=month_abbr(m + 1), font=FONT_LABEL, text_color=hdr_color, width=COL_W, anchor="center", fg_color=hdr_bg, corner_radius=4).grid(row=0, column=m+1, padx=1, pady=2)
-        for i, h in enumerate([tx("Saved"), tx("Missing"), "%", tx("Spent"), tx("Balance")]):
+        for i, h in enumerate([ui_text("Saved", "Odłożono"), ui_text("Missing", "Brakuje"), "%", ui_text("Spent", "Wydano"), ui_text("Bal. Deadline", "Saldo dl."), ui_text("Post Deadl.", "Po terminie")]):
             ctk.CTkLabel(table, text=h, font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=55, anchor="center").grid(row=0, column=13+i, padx=1, pady=2)
 
         row_idx = 1
@@ -2478,17 +2552,21 @@ class SavingsView(ctk.CTkFrame):
                 total = sum(actual_grid.get(c["id"], {}).get(mk, 0.0) for c in children)
                 ctk.CTkLabel(table, text=f"{total:,.0f}" if total else "", font=FONT_SMALL, text_color=COLOR_PRIMARY, width=COL_W, anchor="center").grid(row=r, column=m+1, padx=1, pady=(6, 1))
             # Summary sums for group
-            g_saved = sum(dm.get_cat_total_saved(sp, c["id"]) for c in children)
-            g_missing = sum(dm.get_cat_missing(sp, c["id"]) for c in children)
+            g_saved = sum(dm.get_cat_saved_until_deadline(sp, c["id"]) for c in children)
+            g_missing = sum(dm.get_cat_missing(sp, c["id"], spent_cache=self._spent_cache) for c in children)
             g_target_sum = sum(c.get("target", 0) for c in children)
             g_progress = g_saved / g_target_sum if g_target_sum > 0 else 0.0
-            g_spent = sum(dm.get_savings_spent(data, c["id"]) for c in children)
-            g_balance = g_saved - g_spent
+            g_spent = sum(self._spent_cache.get(c["id"], {}).get("total", 0.0) for c in children)
+            g_spent_deadline = sum(self._spent_cache.get(c["id"], {}).get("until_deadline", 0.0) for c in children)
+            g_balance_deadline = g_saved - g_spent_deadline
+            g_post_deadline = sum(dm.get_cat_saved_after_deadline(sp, c["id"]) for c in children)
+            
             ctk.CTkLabel(table, text=f"{g_saved:,.0f}", font=FONT_SMALL, text_color=COLOR_PRIMARY, width=55, anchor="center").grid(row=r, column=13, padx=1, pady=(6, 1))
             ctk.CTkLabel(table, text=f"{g_missing:,.0f}", font=FONT_SMALL, text_color=COLOR_WARNING if g_missing > 0 else COLOR_SUCCESS, width=55, anchor="center").grid(row=r, column=14, padx=1, pady=(6, 1))
             ctk.CTkLabel(table, text=f"{g_progress*100:.0f}%", font=FONT_SMALL, text_color=COLOR_SUCCESS if g_progress >= 1.0 else COLOR_PRIMARY, width=55, anchor="center").grid(row=r, column=15, padx=1, pady=(6, 1))
             ctk.CTkLabel(table, text=f"{g_spent:,.0f}" if g_spent else "–", font=FONT_SMALL, text_color=COLOR_EXPENSE, width=55, anchor="center").grid(row=r, column=16, padx=1, pady=(6, 1))
-            ctk.CTkLabel(table, text=f"{g_balance:,.0f}", font=FONT_SMALL, text_color=COLOR_SUCCESS if g_balance >= 0 else COLOR_ERROR, width=55, anchor="center").grid(row=r, column=17, padx=1, pady=(6, 1))
+            ctk.CTkLabel(table, text=f"{g_balance_deadline:,.0f}", font=FONT_SMALL, text_color=COLOR_SUCCESS if g_balance_deadline >= 0 else COLOR_ERROR, width=55, anchor="center").grid(row=r, column=17, padx=1, pady=(6, 1))
+            ctk.CTkLabel(table, text=f"{g_post_deadline:,.0f}" if g_post_deadline else "–", font=FONT_SMALL, text_color=COLOR_PRIMARY, width=55, anchor="center").grid(row=r, column=18, padx=1, pady=(6, 1))
 
         for cat in ungrouped:
             render_actual_row(cat, row_idx)
@@ -2582,7 +2660,8 @@ class SavingsView(ctk.CTkFrame):
             saved = dm.get_cat_total_saved(sp, cat_id)
             missing = dm.get_cat_missing(sp, cat_id)
             progress = dm.get_cat_progress(sp, cat_id)
-            spent = dm.get_savings_spent(data, cat_id)
+            raw_spent = self._spent_cache.get(cat_id, 0.0)
+            spent = raw_spent.get("total", 0.0) if isinstance(raw_spent, dict) else raw_spent
             balance = saved - spent
             lbls["saved"].configure(text=f"{saved:,.0f}")
             lbls["missing"].configure(text=f"{missing:,.0f}", text_color=COLOR_WARNING if missing > 0 else COLOR_SUCCESS)
@@ -2844,18 +2923,11 @@ class SavingsActualView(ctk.CTkFrame):
             p_lbl = ctk.CTkLabel(table, text=f"{progress*100:.0f}%", font=FONT_SMALL, text_color=COLOR_SUCCESS if progress >= 1.0 else COLOR_TEXT, width=55, anchor="center")
             p_lbl.grid(row=r, column=15, padx=1, pady=1)
 
-            # Spent - editable in edit mode
-            spent_val = sp.get("spent", {}).get(cat["id"], 0.0)
-            if self.editing:
-                sp_var = ctk.StringVar(value=f"{spent_val:.0f}" if spent_val else "")
-                self.spent_vars[cat["id"]] = sp_var
-                sp_e = ctk.CTkEntry(table, textvariable=sp_var, font=FONT_SMALL, width=55, height=26, fg_color=COLOR_SURFACE_2, border_color=COLOR_BORDER, justify="center")
-                sp_e.grid(row=r, column=16, padx=1, pady=1)
-                sp_e.bind("<KeyRelease>", lambda ev, cid=cat["id"], v=sp_var: self.on_spent_change(cid, v))
-                sp_e.bind("<FocusOut>", lambda ev, cid=cat["id"], v=sp_var: self.on_spent_change(cid, v))
-            else:
-                sp_lbl = ctk.CTkLabel(table, text=f"{spent_val:,.0f}" if spent_val else "–", font=FONT_SMALL, text_color=COLOR_EXPENSE, width=55, anchor="center")
-                sp_lbl.grid(row=r, column=16, padx=1, pady=1)
+            # Spent
+            raw_spent = self._spent_cache.get(cat["id"], 0.0)
+            spent_val = raw_spent.get("total", 0.0) if isinstance(raw_spent, dict) else raw_spent
+            sp_lbl = ctk.CTkLabel(table, text=f"{spent_val:,.0f}" if spent_val else "–", font=FONT_SMALL, text_color=COLOR_EXPENSE, width=55, anchor="center")
+            sp_lbl.grid(row=r, column=16, padx=1, pady=1)
 
             bal_color = COLOR_SUCCESS if balance >= 0 else COLOR_ERROR
             b_lbl = ctk.CTkLabel(table, text=f"{balance:,.0f}", font=FONT_SMALL, text_color=bal_color, width=55, anchor="center")
