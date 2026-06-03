@@ -548,16 +548,22 @@ def delete_savings_group(sp, group_id):
 
 
 # --- Savings Calculations ---
-def get_month_total_allocated(sp, month_key):
+def get_month_total_allocated(sp, month_key, spent_cache=None):
     total = 0.0
-    for cat_id, months in sp.get("grid", {}).items():
-        total += months.get(month_key, 0.0)
+    for cat in sp.get("categories", []):
+        cat_id = cat["id"]
+        raw = sp.get("grid", {}).get(cat_id, {}).get(month_key, 0.0)
+        adj = get_cascade_adjustments(sp, cat_id, spent_cache)
+        if month_key in adj:
+            total += adj[month_key]
+        else:
+            total += raw
     return total
 
 
-def get_month_remaining(sp, month_key):
+def get_month_remaining(sp, month_key, spent_cache=None):
     assumed = sp.get("assumed", {}).get(month_key, 0.0)
-    return assumed - get_month_total_allocated(sp, month_key)
+    return assumed - get_month_total_allocated(sp, month_key, spent_cache)
 
 
 def get_actual_month_total(sp, month_key):

@@ -2146,9 +2146,10 @@ class SavingsView(ctk.CTkFrame):
         dm.save_savings_planner(self.sp)
 
     def update_summaries(self):
+        spent_cache = getattr(self, '_spent_cache', None)
         for m in range(1, 13):
             mk = f"{m:02d}"
-            allocated = dm.get_month_total_allocated(self.sp, mk)
+            allocated = dm.get_month_total_allocated(self.sp, mk, spent_cache)
             assumed = self.sp.get("assumed", {}).get(mk, 0.0)
             remaining = assumed - allocated
             if hasattr(self, 'alloc_lbls') and mk in self.alloc_lbls:
@@ -2164,7 +2165,11 @@ class SavingsView(ctk.CTkFrame):
                     _grouped.setdefault(gid, []).append(c)
             for (gid, mk), lbl in self.group_lbls.items():
                 children = _grouped.get(gid, [])
-                total = sum(self.sp.get("grid", {}).get(c["id"], {}).get(mk, 0.0) for c in children)
+                total = 0.0
+                for c in children:
+                    raw = self.sp.get("grid", {}).get(c["id"], {}).get(mk, 0.0)
+                    adj = dm.get_cascade_adjustments(self.sp, c["id"], spent_cache)
+                    total += adj.get(mk, raw)
                 lbl.configure(text=f"{total:,.0f}")
         if hasattr(self, 'cat_total_lbls'):
             for cat_id, lbl in self.cat_total_lbls.items():
@@ -2350,7 +2355,7 @@ class SavingsView(ctk.CTkFrame):
         ctk.CTkLabel(table, text=tx("Total Allocated"), font=FONT_LABEL, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=row_idx, column=0, padx=2, pady=1, sticky="w")
         for m in range(12):
             mk = f"{m+1:02d}"
-            allocated = dm.get_month_total_allocated(sp, mk)
+            allocated = dm.get_month_total_allocated(sp, mk, self._spent_cache)
             lbl = ctk.CTkLabel(table, text=f"{allocated:,.0f}", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, width=COL_W, anchor="center", fg_color=COLOR_SURFACE_2, corner_radius=4)
             lbl.grid(row=row_idx, column=m+1, padx=1, pady=1)
             self.alloc_lbls[mk] = lbl
@@ -2360,7 +2365,7 @@ class SavingsView(ctk.CTkFrame):
         ctk.CTkLabel(table, text=tx("Remaining"), font=FONT_LABEL, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=row_idx, column=0, padx=2, pady=1, sticky="w")
         for m in range(12):
             mk = f"{m+1:02d}"
-            remaining = dm.get_month_remaining(sp, mk)
+            remaining = dm.get_month_remaining(sp, mk, self._spent_cache)
             color = COLOR_SUCCESS if remaining >= 0 else COLOR_ERROR
             lbl = ctk.CTkLabel(table, text=f"{remaining:,.0f}", font=FONT_SMALL, text_color=color, width=COL_W, anchor="center")
             lbl.grid(row=row_idx, column=m+1, padx=1, pady=1)
@@ -2702,7 +2707,7 @@ class SavingsView(ctk.CTkFrame):
         card.pack_propagate(False)
         card.grid_columnconfigure((0, 1, 2), weight=1, uniform="saving_summary")
         current_month = int(self.controller.current_month.split("-")[1])
-        planned_to_date = sum(dm.get_month_total_allocated(self.sp, f"{m:02d}") for m in range(1, current_month + 1))
+        planned_to_date = sum(dm.get_month_total_allocated(self.sp, f"{m:02d}", getattr(self, '_spent_cache', None)) for m in range(1, current_month + 1))
         actual_to_date = sum(dm.get_actual_month_total(self.sp, f"{m:02d}") for m in range(1, current_month + 1))
         plan_ratio = (actual_to_date / planned_to_date) if planned_to_date > 0 else 0.0
         categories = self.sp.get("categories", [])
