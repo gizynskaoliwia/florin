@@ -710,18 +710,43 @@ def get_expense_categories(data):
     return data.get("expense_categories", [])
 
 
+def get_global_expense_categories():
+    conn = get_connection()
+    rows = conn.execute("SELECT id, MAX(name) as name FROM expense_categories GROUP BY id ORDER BY name COLLATE NOCASE ASC").fetchall()
+    return [{"id": r["id"], "name": r["name"]} for r in rows]
+
+
+def get_global_categories():
+    conn = get_connection()
+    rows = conn.execute("SELECT id, MAX(name) as name, MAX(color) as color, MAX(percent) as percent FROM categories GROUP BY id ORDER BY name COLLATE NOCASE ASC").fetchall()
+    return [{"id": r["id"], "name": r["name"], "percent": r["percent"], "color": r["color"]} for r in rows]
+
+
 def add_expense_category(data, name):
     cat = {"id": generate_id(), "name": name}
     data.setdefault("expense_categories", []).append(cat)
+    # Od razu dodaj do bazy by było widoczne globalnie
+    conn = get_connection()
+    conn.execute("INSERT INTO expense_categories (id, month, name) VALUES (?, ?, ?)", (cat["id"], data.get("month", ""), name))
+    conn.commit()
     return cat
 
 
 def edit_expense_category(data, cat_id, new_name):
+    found = False
     for cat in data.get("expense_categories", []):
         if cat["id"] == cat_id:
             cat["name"] = new_name
-            return cat
-    return None
+            found = True
+            break
+    
+    conn = get_connection()
+    conn.execute("UPDATE expense_categories SET name = ? WHERE id = ?", (new_name, cat_id))
+    conn.commit()
+    
+    if found:
+        return next(c for c in data["expense_categories"] if c["id"] == cat_id)
+    return {"id": cat_id, "name": new_name}
 
 
 def delete_expense_category(data, cat_id):
@@ -729,6 +754,11 @@ def delete_expense_category(data, cat_id):
     for exp in data.get("expenses", []):
         if exp.get("expense_category_id") == cat_id:
             exp["expense_category_id"] = None
+            
+    conn = get_connection()
+    conn.execute("DELETE FROM expense_categories WHERE id = ?", (cat_id,))
+    conn.execute("UPDATE expenses SET expense_category_id = NULL WHERE expense_category_id = ?", (cat_id,))
+    conn.commit()
 
 
 # --- Expense CRUD ---

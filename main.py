@@ -1313,7 +1313,7 @@ class ExpensesView(ctk.CTkFrame):
 
         # Expense Category with inline creation
         ctk.CTkLabel(dialog, text=tx("Expense Category:"), anchor="w").pack(fill="x", padx=20, pady=(10, 3))
-        exp_cats = dm.get_expense_categories(data)
+        exp_cats = dm.get_global_expense_categories()
         create_marker = tx("+ Create new category...")
         exp_cat_options = {display_name(c["name"]): c["id"] for c in exp_cats}
         exp_cat_names = sorted(exp_cat_options.keys(), key=str.casefold) + [create_marker]
@@ -1328,7 +1328,7 @@ class ExpensesView(ctk.CTkFrame):
         exp_cat_menu.pack(fill="x", padx=20)
 
         ctk.CTkLabel(dialog, text=tx("Funding Source:"), anchor="w").pack(fill="x", padx=20, pady=(10, 3))
-        split_cats = data.get("categories", [])
+        split_cats = dm.get_global_categories()
         sp = dm.get_savings_planner()
         sav_cats = sp.get("categories", [])
         source_options = {}
@@ -1385,7 +1385,7 @@ class ExpensesView(ctk.CTkFrame):
                 date_error_lbl.configure(text=tx("Invalid date. Use DD/MM/YYYY format."))
                 save_btn.configure(state="normal")
                 return
-            exp_cats_current = dm.get_expense_categories(data)
+            exp_cats_current = dm.get_global_expense_categories()
             exp_cat_id = next((c["id"] for c in exp_cats_current if display_name(c["name"]) == exp_cat_var.get()), None)
             desc = desc_entry.get().strip()
             tags = [t.strip() for t in tags_entry.get().split(",") if t.strip()]
@@ -1444,7 +1444,7 @@ class ExpensesView(ctk.CTkFrame):
         if name and name.strip():
             dm.add_expense_category(data, name.strip())
             self.controller.save_data()
-            exp_cats = dm.get_expense_categories(data)
+            exp_cats = dm.get_global_expense_categories()
             new_names = [display_name(c["name"]) for c in exp_cats] + [create_marker]
             exp_cat_menu.configure(values=new_names)
             exp_cat_var.set(display_name(name.strip()))
@@ -1466,7 +1466,7 @@ class ExpensesView(ctk.CTkFrame):
         def rebuild():
             for w in list_frame.winfo_children():
                 w.destroy()
-            for cat in dm.get_expense_categories(data):
+            for cat in dm.get_global_expense_categories():
                 row = ctk.CTkFrame(list_frame, fg_color=COLOR_SURFACE_2, corner_radius=8)
                 row.pack(fill="x", pady=2)
                 ctk.CTkLabel(row, text=display_name(cat["name"]), font=FONT_BODY, text_color=COLOR_TEXT).pack(side="left", padx=10, pady=8)
@@ -1594,7 +1594,7 @@ class ExpensesView(ctk.CTkFrame):
             if self._date_key(e).month == self.filter_month and self._date_key(e).year == self.filter_year
         ]
         self._filter_button(tx("All"), len(month_expenses), self.active_source_id is None, lambda: self.set_source_filter(None))
-        for cat in self.controller.data.get("categories", []):
+        for cat in dm.get_global_categories():
             count = sum(1 for exp in month_expenses if exp.get("category_id") == cat["id"])
             self._filter_button(display_category_name(cat), count, self.active_source_id == cat["id"], lambda cid=cat["id"]: self.set_source_filter(cid), category_color(cat))
 
@@ -1689,7 +1689,7 @@ class ExpensesView(ctk.CTkFrame):
                 child.bind("<Button-1>", lambda _e, exp_id=exp["id"]: self._select_expense(exp_id))
 
     def _build_expense_list_by_category(self, expenses):
-        source_order = self.controller.data.get("categories", [])
+        source_order = dm.get_global_categories()
         savings_bucket = {"id": "savings", "name": tx("Savings goals"), "color": COLOR_SUCCESS}
         buckets = []
         for cat in source_order:
@@ -1849,20 +1849,20 @@ class ExpensesView(ctk.CTkFrame):
         self.refresh()
 
     def _expense_category_name(self, exp):
-        exp_cats = {c["id"]: c["name"] for c in dm.get_expense_categories(self.controller.data)}
+        exp_cats = {c["id"]: c["name"] for c in dm.get_global_expense_categories()}
         return display_name(exp_cats.get(exp.get("expense_category_id"), "Uncategorized"))
 
     def _source_name(self, exp):
         if exp.get("savings_category_id"):
             sp = dm.get_savings_planner()
             return next((display_name(c["name"]) for c in sp.get("categories", []) if c["id"] == exp["savings_category_id"]), tx("Savings"))
-        split_cats = {c["id"]: c["name"] for c in self.controller.data.get("categories", [])}
+        split_cats = {c["id"]: c["name"] for c in dm.get_global_categories()}
         return display_name(split_cats.get(exp.get("category_id"), "Unknown"))
 
     def _source_category(self, exp):
         if exp.get("savings_category_id"):
             return None
-        return next((c for c in self.controller.data.get("categories", []) if c["id"] == exp.get("category_id")), None)
+        return next((c for c in dm.get_global_categories() if c["id"] == exp.get("category_id")), None)
 
     def _source_icon(self, cat):
         if not cat:
@@ -3520,7 +3520,7 @@ class HistoryView(ctk.CTkFrame):
         card.grid(row=0, column=column, sticky="nsew", padx=8)
         ctk.CTkLabel(card, text=ui_text("Top expense categories", "Top kategorie wydatków").upper(), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).pack(anchor="w", padx=18, pady=(18, 12))
         grouped = dm.get_expenses_by_expense_category(data)
-        exp_cats = {c["id"]: display_name(c["name"]) for c in dm.get_expense_categories(data)}
+        exp_cats = {c["id"]: display_name(c["name"]) for c in dm.get_global_expense_categories()}
         rows = []
         for cat_id, items in grouped.items():
             rows.append((sum(exp["amount"] for exp in items), exp_cats.get(cat_id, tx("Uncategorized")), len(items)))
