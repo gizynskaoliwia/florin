@@ -4279,6 +4279,12 @@ class SharedGoalsView(ctk.CTkFrame):
             hdr.pack(fill="x", padx=24, pady=(20, 10))
             ctk.CTkLabel(hdr, text=goal["name"], font=FONT_SECTION, text_color=COLOR_TEXT).pack(side="left")
             
+            actions = ctk.CTkFrame(hdr, fg_color="transparent")
+            actions.pack(side="right")
+            
+            ctk.CTkButton(actions, text="Wypłać / Wydatek", width=120, height=28, fg_color=COLOR_WARNING, text_color=COLOR_SURFACE, font=FONT_LABEL, command=lambda g=goal: self.open_withdraw_modal(g)).pack(side="right", padx=(10, 0))
+            ctk.CTkButton(actions, text="Historia wypłat", width=120, height=28, fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_SURFACE, border_width=1, border_color=COLOR_BORDER, font=FONT_LABEL, command=lambda g=goal: self.open_history_modal(g)).pack(side="right")
+            
             # Table container
             grid = ctk.CTkFrame(card, fg_color="transparent")
             grid.pack(fill="x", padx=24, pady=(0, 24))
@@ -4378,6 +4384,109 @@ class SharedGoalsView(ctk.CTkFrame):
             ctk.CTkLabel(grid, text=f"{total_planned_all:,.0f}", font=FONT_MONO, text_color=COLOR_TEXT_MUTED, width=80).grid(row=row_idx, column=col_idx, padx=2, pady=5)
             comb_tot_color = COLOR_SUCCESS if total_actual_all >= total_planned_all and total_planned_all > 0 else COLOR_TEXT
             ctk.CTkLabel(grid, text=f"{total_actual_all:,.0f}", font=FONT_MONO, text_color=comb_tot_color, width=80).grid(row=row_idx, column=col_idx+1, padx=2, pady=5)
+
+            total_withdrawn = sum(w["amount"] for w in goal.get("withdrawals", []))
+            available = total_actual_all - total_withdrawn
+            
+            summary_frame = ctk.CTkFrame(card, fg_color=COLOR_SURFACE_2, corner_radius=RADIUS_BUTTON)
+            summary_frame.pack(fill="x", padx=24, pady=(0, 24))
+            
+            ctk.CTkLabel(summary_frame, text=f"Zgromadzono: {total_actual_all:,.2f} PLN", font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(side="left", padx=16, pady=12)
+            ctk.CTkLabel(summary_frame, text=f"Wypłacono: {total_withdrawn:,.2f} PLN", font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(side="left", padx=16, pady=12)
+            
+            avail_color = COLOR_SUCCESS if available >= 0 else COLOR_ERROR
+            ctk.CTkLabel(summary_frame, text=f"Dostępne: {available:,.2f} PLN", font=FONT_TITLE, text_color=avail_color).pack(side="right", padx=16, pady=12)
+
+    def open_withdraw_modal(self, goal):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(f"Wypłata: {goal['name']}")
+        dialog.geometry("400x400")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        
+        ctk.CTkLabel(dialog, text=f"Dodaj wydatek / wypłatę", font=FONT_TITLE, text_color=COLOR_TEXT).pack(pady=(20, 10))
+        
+        ctk.CTkLabel(dialog, text="Kwota (PLN):", anchor="w").pack(fill="x", padx=20, pady=(10, 2))
+        amount_var = ctk.StringVar()
+        ctk.CTkEntry(dialog, textvariable=amount_var, font=FONT_BODY).pack(fill="x", padx=20)
+        
+        ctk.CTkLabel(dialog, text="Data (DD/MM/YYYY):", anchor="w").pack(fill="x", padx=20, pady=(10, 2))
+        date_var = ctk.StringVar(value=datetime.today().strftime("%d/%m/%Y"))
+        ctk.CTkEntry(dialog, textvariable=date_var, font=FONT_BODY).pack(fill="x", padx=20)
+        
+        ctk.CTkLabel(dialog, text="Opis:", anchor="w").pack(fill="x", padx=20, pady=(10, 2))
+        desc_var = ctk.StringVar()
+        ctk.CTkEntry(dialog, textvariable=desc_var, font=FONT_BODY).pack(fill="x", padx=20)
+        
+        error_lbl = ctk.CTkLabel(dialog, text="", text_color=COLOR_ERROR, font=FONT_SMALL)
+        error_lbl.pack(pady=5)
+        
+        def save():
+            try:
+                amt = float(amount_var.get().replace(",", "."))
+                if amt <= 0: raise ValueError
+            except:
+                error_lbl.configure(text="Nieprawidłowa kwota.")
+                return
+                
+            d_str = date_var.get().strip()
+            try:
+                dt = datetime.strptime(d_str, "%d/%m/%Y")
+                iso_date = dt.strftime("%Y-%m-%d")
+            except:
+                error_lbl.configure(text="Nieprawidłowy format daty.")
+                return
+                
+            desc = desc_var.get().strip()
+            if not desc:
+                error_lbl.configure(text="Opis jest wymagany.")
+                return
+                
+            dm.add_shared_goal_transaction(goal["id"], iso_date, amt, desc)
+            dialog.destroy()
+            self.refresh()
+            
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=20)
+        ctk.CTkButton(btn_frame, text="Anuluj", fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_SURFACE, command=dialog.destroy).pack(side="left", expand=True, padx=5)
+        ctk.CTkButton(btn_frame, text="Zapisz", fg_color=COLOR_PRIMARY, text_color=COLOR_SURFACE, command=save).pack(side="right", expand=True, padx=5)
+
+    def open_history_modal(self, goal):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(f"Historia wypłat: {goal['name']}")
+        dialog.geometry("500x500")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        
+        ctk.CTkLabel(dialog, text="Historia wypłat", font=FONT_TITLE, text_color=COLOR_TEXT).pack(pady=20)
+        
+        scroll = ctk.CTkScrollableFrame(dialog, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        withdrawals = goal.get("withdrawals", [])
+        if not withdrawals:
+            ctk.CTkLabel(scroll, text="Brak wypłat.", font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(pady=20)
+            return
+            
+        def delete_w(w_id):
+            dm.delete_shared_goal_transaction(w_id)
+            dialog.destroy()
+            self.refresh()
+            self.open_history_modal(next(g for g in self.goals if g["id"] == goal["id"]))
+            
+        for w in withdrawals:
+            row = ctk.CTkFrame(scroll, fg_color=COLOR_SURFACE_2, corner_radius=8)
+            row.pack(fill="x", pady=5)
+            
+            info = ctk.CTkFrame(row, fg_color="transparent")
+            info.pack(side="left", padx=10, pady=10, fill="x", expand=True)
+            
+            ctk.CTkLabel(info, text=w["date"], font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(anchor="w")
+            ctk.CTkLabel(info, text=w["description"], font=FONT_BODY, text_color=COLOR_TEXT).pack(anchor="w")
+            
+            ctk.CTkLabel(row, text=f"-{w['amount']:,.2f} PLN", font=FONT_MONO, text_color=COLOR_ERROR).pack(side="left", padx=10)
+            
+            ctk.CTkButton(row, text="Usuń", width=60, fg_color=COLOR_ERROR, text_color=COLOR_SURFACE, command=lambda wid=w["id"]: delete_w(wid)).pack(side="right", padx=10)
 
 class HelpView(ctk.CTkFrame):
     def __init__(self, parent, controller):

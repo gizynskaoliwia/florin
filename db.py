@@ -274,6 +274,16 @@ CREATE TABLE IF NOT EXISTS shared_goals_data (
     PRIMARY KEY (goal_id, month_key, person_id)
 );
 
+-- Shared goals transactions (withdrawals)
+CREATE TABLE IF NOT EXISTS shared_goals_transactions (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS emergency_fund_settings (
     mode TEXT PRIMARY KEY,
     salary REAL NOT NULL DEFAULT 0.0,

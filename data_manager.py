@@ -914,9 +914,32 @@ def get_shared_goals():
                 "actual": drow["actual"]
             }
             
+        goal["withdrawals"] = []
+        w_rows = conn.execute("SELECT id, date, amount, description FROM shared_goals_transactions WHERE goal_id = ? ORDER BY date DESC, created_at DESC", (goal_id,)).fetchall()
+        for w in w_rows:
+            goal["withdrawals"].append({
+                "id": w["id"], 
+                "date": w["date"], 
+                "amount": w["amount"], 
+                "description": w["description"]
+            })
+            
         goals.append(goal)
         
     return goals
+
+def add_shared_goal_transaction(goal_id, date, amount, description=""):
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO shared_goals_transactions (id, goal_id, date, amount, description) VALUES (?, ?, ?, ?, ?)",
+        (generate_id(), goal_id, date, amount, description)
+    )
+    conn.commit()
+
+def delete_shared_goal_transaction(transaction_id):
+    conn = get_connection()
+    conn.execute("DELETE FROM shared_goals_transactions WHERE id = ?", (transaction_id,))
+    conn.commit()
 
 def save_shared_goals(goals):
     conn = get_connection()
