@@ -1437,7 +1437,7 @@ class ExpensesView(ctk.CTkFrame):
                 exp["savings_category_id"] = savings_cat_id
             self.controller.save_data()
             dialog.destroy()
-            self.refresh()
+            self._schedule_refresh()
 
         save_btn.configure(command=save)
         save_btn.pack(fill="x", padx=20, pady=15)
@@ -4265,6 +4265,21 @@ class SharedGoalsView(ctk.CTkFrame):
         )
         self.btn_edit.pack(side="right")
         
+        self.show_all_months = False
+        
+        def toggle_show_all():
+            self.show_all_months = not self.show_all_months
+            self.btn_show_all.configure(text="Ukryj stare" if self.show_all_months else "Pokaż wszystkie")
+            self.refresh()
+            
+        self.btn_show_all = ctk.CTkButton(
+            hdr, text="Pokaż wszystkie", width=120, height=36,
+            fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER, corner_radius=RADIUS_BUTTON,
+            font=FONT_LABEL, command=toggle_show_all
+        )
+        self.btn_show_all.pack(side="right", padx=(0, 10))
+        
         self.editing = False
         
         # Scrollable area
@@ -4401,11 +4416,23 @@ class SharedGoalsView(ctk.CTkFrame):
             status_header_text = "Akcje" if self.editing else t("shared.status")
             ctk.CTkLabel(grid, text=status_header_text, font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=0, column=col_idx, rowspan=2, padx=5, pady=5)
             
-            months = sorted(goal["data"].keys())
-            row_idx = 2
-            
+            all_months = sorted(goal["data"].keys())
+            if getattr(self, "show_all_months", False):
+                months = all_months
+            else:
+                months = all_months[-6:] if len(all_months) > 6 else all_months
+
             tot_planned = {p["id"]: 0.0 for p in persons}
             tot_actual = {p["id"]: 0.0 for p in persons}
+            
+            # Pre-calculate totals using ALL months
+            for mk in all_months:
+                for p in persons:
+                    pdata = goal["data"][mk].get(p["id"], {"planned": 0.0, "actual": 0.0})
+                    tot_planned[p["id"]] += pdata["planned"]
+                    tot_actual[p["id"]] += pdata["actual"]
+            
+            row_idx = 2
             
             for mk in months:
                 try:
@@ -4425,8 +4452,6 @@ class SharedGoalsView(ctk.CTkFrame):
                     pid = p["id"]
                     pdata = goal["data"][mk].get(pid, {"planned": 0.0, "actual": 0.0})
                     
-                    tot_planned[pid] += pdata["planned"]
-                    tot_actual[pid] += pdata["actual"]
                     month_planned_sum += pdata["planned"]
                     month_actual_sum += pdata["actual"]
                     
