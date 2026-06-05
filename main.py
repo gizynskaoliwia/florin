@@ -1216,8 +1216,10 @@ class ExpensesView(ctk.CTkFrame):
         self.active_source_id = None
         self.group_mode = "date"
         self.selected_expense_id = None
+        self.render_limit = 50
         self.search_var = ctk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self.refresh())
+        self._search_job = None
+        self.search_var.trace_add("write", lambda *_: self._schedule_refresh())
 
         self.topbar = ctk.CTkFrame(self, fg_color=COLOR_BG, height=60, corner_radius=0)
         self.topbar.pack(fill="x")
@@ -1262,6 +1264,11 @@ class ExpensesView(ctk.CTkFrame):
 
         self.detail_card = make_card(self.content_grid)
         self.detail_card.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+
+    def _schedule_refresh(self):
+        if self._search_job is not None:
+            self.after_cancel(self._search_job)
+        self._search_job = self.after(300, self.refresh)
 
     # --- Add Expense Dialog ---
     def open_add_expense(self, edit_exp=None):
@@ -1532,7 +1539,9 @@ class ExpensesView(ctk.CTkFrame):
         self.refresh()
 
     # --- Refresh / Build List + Detail ---
-    def refresh(self):
+    def refresh(self, reset_limit=True):
+        if reset_limit:
+            self.render_limit = 50
         data = self.controller.data
         if "expense_categories" not in data:
             data["expense_categories"] = list(dm.DEFAULT_EXPENSE_CATEGORIES)
@@ -1637,8 +1646,9 @@ class ExpensesView(ctk.CTkFrame):
             self._build_expense_list_by_category(expenses)
             return
 
+        limited_expenses = expenses[:self.render_limit]
         current_day = None
-        for exp in expenses:
+        for exp in limited_expenses:
             day = exp.get("date", "")
             if day != current_day:
                 current_day = day
@@ -1688,6 +1698,14 @@ class ExpensesView(ctk.CTkFrame):
             for child in row.winfo_children() + body.winfo_children() + amount_col.winfo_children():
                 child.bind("<Button-1>", lambda _e, exp_id=exp["id"]: self._select_expense(exp_id))
 
+        if len(expenses) > self.render_limit:
+            btn = ctk.CTkButton(self.scroll, text=tx("Load more..."), fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self._load_more)
+            btn.pack(pady=20)
+
+    def _load_more(self):
+        self.render_limit += 50
+        self.refresh(reset_limit=False)
+
     def _build_expense_list_by_category(self, expenses):
         source_order = dm.get_global_categories()
         savings_bucket = {"id": "savings", "name": tx("Savings goals"), "color": COLOR_SUCCESS}
@@ -1706,8 +1724,12 @@ class ExpensesView(ctk.CTkFrame):
             hdr.pack(fill="x", padx=0, pady=(10, 0))
             ctk.CTkLabel(hdr, text=display_category_name(cat).upper(), font=FONT_LABEL, text_color=category_color(cat)).pack(side="left", padx=20, pady=8)
             ctk.CTkLabel(hdr, text=f"{item_count(len(cat_expenses))} · - {format_money(total)}", font=FONT_MONO, text_color=COLOR_TEXT_MUTED).pack(side="right", padx=20)
-            for exp in sorted(cat_expenses, key=lambda e: self._date_key(e), reverse=True):
+            for exp in sorted(cat_expenses, key=lambda e: self._date_key(e), reverse=True)[:self.render_limit]:
                 self._expense_row(exp)
+
+        if len(expenses) > self.render_limit:
+            btn = ctk.CTkButton(self.scroll, text=tx("Load more..."), fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_BORDER, command=self._load_more)
+            btn.pack(pady=20)
 
     def _expense_row(self, exp):
         selected = exp["id"] == self.selected_expense_id
@@ -3354,7 +3376,13 @@ class HistoryView(ctk.CTkFrame):
         self.year = int(controller.current_month.split("-")[0])
         self.expanded_month = None
         self.search_var = ctk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self.refresh())
+        self._search_job = None
+        self.search_var.trace_add("write", lambda *_: self._schedule_refresh())
+
+    def _schedule_refresh(self):
+        if self._search_job is not None:
+            self.after_cancel(self._search_job)
+        self._search_job = self.after(300, self.refresh)
 
         self.topbar = ctk.CTkFrame(self, fg_color=COLOR_BG, height=60, corner_radius=0)
         self.topbar.pack(fill="x")
@@ -4506,7 +4534,13 @@ class HelpView(ctk.CTkFrame):
 
         # Search box
         self._search_var = ctk.StringVar()
-        self._search_var.trace_add("write", lambda *_: self._filter())
+        self._search_job = None
+        self._search_var.trace_add("write", lambda *_: self._schedule_filter())
+
+    def _schedule_filter(self):
+        if self._search_job is not None:
+            self.after_cancel(self._search_job)
+        self._search_job = self.after(300, self._filter)
         search = ctk.CTkEntry(hdr, textvariable=self._search_var, placeholder_text=t("help.search_placeholder"), width=220)
         search.pack(side="right")
 
