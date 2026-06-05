@@ -419,7 +419,7 @@ class ExpensesView(ctk.CTkFrame):
     def _filter_button(self, label, count, active, command, color=None):
         text = f"{label} · {count}"
         ctk.CTkButton(
-            self.tag_bar, text=text, height=32, width=max(72, len(text) * 8),
+            self.tag_bar, text=text, height=32,
             fg_color=COLOR_PRIMARY_SOFT if active else COLOR_SURFACE_2,
             text_color=(color or COLOR_PRIMARY) if active else COLOR_TEXT,
             hover_color=COLOR_PRIMARY_SOFT if active else COLOR_BORDER,

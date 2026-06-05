@@ -133,14 +133,15 @@ def make_pill(parent, text, color, width=None, height=28):
         border_color=color,
         height=height,
     )
-    if width is not None:
-        pill.configure(width=width)
-        pill.pack_propagate(False)
+    # Never set pack_propagate(False) — let the pill auto-size to its content.
+    # The width parameter is kept for API compatibility but only used as a
+    # minimum width hint; the pill will still grow if the text needs more space.
     dot = ctk.CTkFrame(pill, width=8, height=8, fg_color=color, corner_radius=3)
-    dot.pack(side="left", padx=(10, 6))
+    dot.pack(side="left", padx=(10, 6), pady=max(1, (height - 8) // 2))
     dot.pack_propagate(False)
-    ctk.CTkLabel(pill, text=display_name(text), font=FONT_SMALL, text_color=COLOR_TEXT, height=height).pack(side="left", padx=(0, 10))
+    ctk.CTkLabel(pill, text=display_name(text), font=FONT_SMALL, text_color=COLOR_TEXT, height=height).pack(side="left", padx=(0, 12))
     return pill
+
 
 
 def make_card(parent, **kwargs):
