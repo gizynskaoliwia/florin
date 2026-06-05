@@ -468,9 +468,12 @@ class ExpensesView(ctk.CTkFrame):
         tag_row.pack(anchor="w", pady=(4, 0))
         tag_labels = []
         for _ in range(3):
-            lbl = ctk.CTkLabel(tag_row, text="", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, fg_color=COLOR_SURFACE_2, corner_radius=6)
-            lbl.pack(side="left", padx=(0, 4), ipadx=6, ipady=2)
-            tag_labels.append(lbl)
+            # Use a frame for proper padding without corner clipping
+            tag_frame = ctk.CTkFrame(tag_row, fg_color=COLOR_SURFACE_2, corner_radius=12, height=24)
+            tag_frame.pack(side="left", padx=(0, 6))
+            lbl = ctk.CTkLabel(tag_frame, text="", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED)
+            lbl.pack(padx=10, pady=2)
+            tag_labels.append((tag_frame, lbl))
             
         amount_col = ctk.CTkFrame(row, fg_color="transparent")
         amount_col.pack(side="right", padx=(12, 20))
@@ -605,12 +608,12 @@ class ExpensesView(ctk.CTkFrame):
         tags = exp.get("tags", [])[:3]
         if tags:
             w["tag_row"].pack(anchor="w", pady=(4, 0))
-            for i, lbl in enumerate(w["tag_labels"]):
+            for i, (frame, lbl) in enumerate(w["tag_labels"]):
                 if i < len(tags):
                     lbl.configure(text=tags[i])
-                    lbl.pack(side="left", padx=(0, 4), ipadx=6, ipady=2)
+                    frame.pack(side="left", padx=(0, 6))
                 else:
-                    lbl.pack_forget()
+                    frame.pack_forget()
         else:
             w["tag_row"].pack_forget()
             

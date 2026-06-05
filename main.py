@@ -124,22 +124,22 @@ def month_year_label(month_str, upper=False):
     return label.upper() if upper else label
 
 
-def make_pill(parent, text, color, width=None, height=28):
+def make_pill(parent, text, color, width=None, height=30):
     pill = ctk.CTkFrame(
         parent,
         fg_color=COLOR_SURFACE_2,
-        corner_radius=RADIUS_BUTTON,
+        corner_radius=15,  # Fully rounded pill shape
         border_width=1,
         border_color=color,
         height=height,
     )
-    # Never set pack_propagate(False) — let the pill auto-size to its content.
-    # The width parameter is kept for API compatibility but only used as a
-    # minimum width hint; the pill will still grow if the text needs more space.
-    dot = ctk.CTkFrame(pill, width=8, height=8, fg_color=color, corner_radius=3)
-    dot.pack(side="left", padx=(10, 6), pady=max(1, (height - 8) // 2))
+    # The pill will auto-size to its content
+    dot = ctk.CTkFrame(pill, width=10, height=10, fg_color=color, corner_radius=5)
+    dot.pack(side="left", padx=(12, 6), pady=max(1, (height - 10) // 2))
     dot.pack_propagate(False)
-    ctk.CTkLabel(pill, text=display_name(text), font=FONT_SMALL, text_color=COLOR_TEXT, height=height).pack(side="left", padx=(0, 12))
+    
+    # Do not force height on the label so it naturally centers without clipping
+    ctk.CTkLabel(pill, text=display_name(text), font=FONT_SMALL, text_color=COLOR_TEXT).pack(side="left", padx=(0, 16))
     return pill
 
 

@@ -184,7 +184,18 @@ class SharedGoalsView(ctk.CTkFrame):
             if getattr(self, "show_all_months", False):
                 months = all_months
             else:
-                months = all_months[-6:] if len(all_months) > 6 else all_months
+                base_m = self.controller.current_month
+                visible_set = set()
+                for offset in range(-2, 3):
+                    y, m = map(int, base_m.split('-'))
+                    m += offset
+                    while m > 12: m -= 12; y += 1
+                    while m < 1: m += 12; y -= 1
+                    visible_set.add(f"{y}-{m:02d}")
+                months = [m for m in all_months if m in visible_set]
+                # If there are no intersecting months, just show everything
+                if not months:
+                    months = all_months
 
             tot_planned = {p["id"]: 0.0 for p in persons}
             tot_actual = {p["id"]: 0.0 for p in persons}
