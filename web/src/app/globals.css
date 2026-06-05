@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg: #FFF5F8;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #FFF0F4;
+  --color-border: #F0C8D8;
+  --color-primary: #C96B98;
+  --color-primary-hover: #A84E7C;
+  --color-accent: #D4A8E8;
+  --color-text: #2D1B2E;
+  --color-text-muted: #7C5E6A;
+  --color-text-faint: #C4A8B4;
+  
+  --color-success: #6BAD8A;
+  --color-warning: #D4955A;
+  --color-error: #C96B6B;
+  --color-income: #5A9E8A;
+  --color-expense: #C96B80;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1E1520;
+    --color-surface: #2A1D28;
+    --color-surface-2: #321F2F;
+    --color-border: #4D3347;
+    --color-primary: #E08DB8;
+    --color-primary-hover: #CC6FA0;
+    --color-accent: #B885D4;
+    --color-text: #F2E6EF;
+    --color-text-muted: #B89AAA;
+    --color-text-faint: #6B4E5E;
+
+    --color-success: #7DC99F;
+    --color-warning: #E8A86A;
+    --color-error: #E08D8D;
+    --color-income: #7DC9B2;
+    --color-expense: #E08D9E;
+  }
+}
+
+@theme inline {
+  --color-app-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-border: var(--color-border);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --color-income: var(--color-income);
+  --color-expense: var(--color-expense);
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
