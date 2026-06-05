@@ -124,22 +124,38 @@ def month_year_label(month_str, upper=False):
     return label.upper() if upper else label
 
 
-def make_pill(parent, text, color, width=None, height=30):
+def make_pill(parent, text, color, width=None, height=26):
+    display_txt = display_name(text)
+    
+    # Calculate required width based on text
+    from customtkinter import CTkFont
+    font = CTkFont(family=FONT_SMALL[0], size=FONT_SMALL[1])
+    text_width = font.measure(display_txt)
+    
+    # Dot is 8px wide.
+    # Padding: 10px left of dot, 6px right of dot, text, 14px right of text.
+    # Total extra width = 10 + 8 + 6 + 14 = 38
+    req_width = text_width + 38 
+    
+    if width:
+        req_width = max(width, req_width)
+        
     pill = ctk.CTkFrame(
         parent,
         fg_color=COLOR_SURFACE_2,
-        corner_radius=15,  # Fully rounded pill shape
+        corner_radius=height // 2,
         border_width=1,
         border_color=color,
+        width=req_width,
         height=height,
     )
-    # The pill will auto-size to its content
-    dot = ctk.CTkFrame(pill, width=10, height=10, fg_color=color, corner_radius=5)
-    dot.pack(side="left", padx=(12, 6), pady=max(1, (height - 10) // 2))
-    dot.pack_propagate(False)
+    pill.pack_propagate(False)
     
-    # Do not force height on the label so it naturally centers without clipping
-    ctk.CTkLabel(pill, text=display_name(text), font=FONT_SMALL, text_color=COLOR_TEXT).pack(side="left", padx=(0, 16))
+    dot = ctk.CTkFrame(pill, width=8, height=8, fg_color=color, corner_radius=4)
+    dot.place(relx=0, rely=0.5, anchor="w", x=10)
+    
+    lbl = ctk.CTkLabel(pill, text=display_txt, font=FONT_SMALL, text_color=COLOR_TEXT)
+    lbl.place(relx=0, rely=0.5, anchor="w", x=24)
     return pill
 
 

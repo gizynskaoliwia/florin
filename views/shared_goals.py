@@ -73,7 +73,11 @@ class SharedGoalsView(ctk.CTkFrame):
                 val = 0.0
             
             for g in self.goals:
-                if g["id"] == goal_id and mk in g["data"]:
+                if g["id"] == goal_id:
+                    if mk not in g["data"]:
+                        g["data"][mk] = {p["id"]: {"planned": 0.0, "actual": 0.0} for p in g["persons"]}
+                    if pid not in g["data"][mk]:
+                        g["data"][mk][pid] = {"planned": 0.0, "actual": 0.0}
                     g["data"][mk][pid][fld] = val
                     break
 
@@ -192,10 +196,7 @@ class SharedGoalsView(ctk.CTkFrame):
                     while m > 12: m -= 12; y += 1
                     while m < 1: m += 12; y -= 1
                     visible_set.add(f"{y}-{m:02d}")
-                months = [m for m in all_months if m in visible_set]
-                # If there are no intersecting months, just show everything
-                if not months:
-                    months = all_months
+                months = sorted(list(visible_set))
 
             tot_planned = {p["id"]: 0.0 for p in persons}
             tot_actual = {p["id"]: 0.0 for p in persons}
@@ -225,7 +226,8 @@ class SharedGoalsView(ctk.CTkFrame):
                 
                 for p in persons:
                     pid = p["id"]
-                    pdata = goal["data"][mk].get(pid, {"planned": 0.0, "actual": 0.0})
+                    month_data = goal["data"].get(mk, {})
+                    pdata = month_data.get(pid, {"planned": 0.0, "actual": 0.0})
                     
                     month_planned_sum += pdata["planned"]
                     month_actual_sum += pdata["actual"]

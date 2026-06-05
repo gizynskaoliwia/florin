@@ -468,12 +468,10 @@ class ExpensesView(ctk.CTkFrame):
         tag_row.pack(anchor="w", pady=(4, 0))
         tag_labels = []
         for _ in range(3):
-            # Use a frame for proper padding without corner clipping
-            tag_frame = ctk.CTkFrame(tag_row, fg_color=COLOR_SURFACE_2, corner_radius=12, height=24)
-            tag_frame.pack(side="left", padx=(0, 6))
-            lbl = ctk.CTkLabel(tag_frame, text="", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED)
-            lbl.pack(padx=10, pady=2)
-            tag_labels.append((tag_frame, lbl))
+            # CTkButton flawlessly handles dynamic sizing and pill shapes natively
+            btn = ctk.CTkButton(tag_row, text="", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, fg_color=COLOR_SURFACE_2, hover=False, height=24, width=10, corner_radius=12)
+            btn.pack(side="left", padx=(0, 6))
+            tag_labels.append(btn)
             
         amount_col = ctk.CTkFrame(row, fg_color="transparent")
         amount_col.pack(side="right", padx=(12, 20))
@@ -608,12 +606,12 @@ class ExpensesView(ctk.CTkFrame):
         tags = exp.get("tags", [])[:3]
         if tags:
             w["tag_row"].pack(anchor="w", pady=(4, 0))
-            for i, (frame, lbl) in enumerate(w["tag_labels"]):
+            for i, btn in enumerate(w["tag_labels"]):
                 if i < len(tags):
-                    lbl.configure(text=tags[i])
-                    frame.pack(side="left", padx=(0, 6))
+                    btn.configure(text=tags[i])
+                    btn.pack(side="left", padx=(0, 6))
                 else:
-                    frame.pack_forget()
+                    btn.pack_forget()
         else:
             w["tag_row"].pack_forget()
             
