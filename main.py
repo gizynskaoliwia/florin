@@ -4276,19 +4276,7 @@ class SharedGoalsView(ctk.CTkFrame):
         
     def toggle_edit(self):
         if self.editing:
-            # Save data
-            for (goal_id, mk, pid, fld), var in self.cell_vars.items():
-                try:
-                    val = float(var.get().replace(",", "."))
-                except:
-                    val = 0.0
-                
-                # find goal
-                for g in self.goals:
-                    if g["id"] == goal_id:
-                        g["data"][mk][pid][fld] = val
-                        break
-            
+            self._save_current_edits()
             dm.save_shared_goals(self.goals)
             self.editing = False
             self.btn_edit.configure(text=t("Edit"), fg_color=COLOR_SURFACE, text_color=COLOR_TEXT, border_color=COLOR_BORDER, hover_color=COLOR_SURFACE_2)
@@ -4297,8 +4285,80 @@ class SharedGoalsView(ctk.CTkFrame):
             self.editing = True
             self.btn_edit.configure(text=t("Save"), fg_color=COLOR_SUCCESS, text_color=COLOR_SURFACE, hover_color=COLOR_MET_PLAN, border_width=0)
             self.refresh()
+
+    def _save_current_edits(self):
+        for (goal_id, mk, pid, fld), var in self.cell_vars.items():
+            try:
+                val = float(var.get().replace(",", "."))
+            except:
+                val = 0.0
+            
+            for g in self.goals:
+                if g["id"] == goal_id and mk in g["data"]:
+                    g["data"][mk][pid][fld] = val
+                    break
+
+    def delete_month(self, goal, month_key):
+        self._save_current_edits()
+        if month_key in goal["data"]:
+            del goal["data"][month_key]
+            dm.save_shared_goals(self.goals)
+        self.refresh()
+
+    def add_month(self, goal):
+        self._save_current_edits()
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Dodaj miesiąc")
+        dialog.geometry("300x200")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        ctk.CTkLabel(dialog, text="Miesiąc (YYYY-MM):", anchor="w").pack(fill="x", padx=20, pady=(20, 5))
+        
+        next_m = ""
+        if goal.get("data"):
+            last_m = sorted(goal["data"].keys())[-1]
+            try:
+                y, m = map(int, last_m.split("-"))
+                m += 1
+                if m > 12:
+                    m = 1
+                    y += 1
+                next_m = f"{y}-{m:02d}"
+            except:
+                pass
+                
+        m_var = ctk.StringVar(value=next_m)
+        ctk.CTkEntry(dialog, textvariable=m_var).pack(fill="x", padx=20)
+        
+        err_lbl = ctk.CTkLabel(dialog, text="", text_color=COLOR_ERROR, font=FONT_SMALL)
+        err_lbl.pack(pady=5)
+        
+        def save():
+            mk = m_var.get().strip()
+            import re
+            if not re.match(r"^\d{4}-\d{2}$", mk):
+                err_lbl.configure(text="Format musi być YYYY-MM")
+                return
+            if mk in goal["data"]:
+                err_lbl.configure(text="Taki miesiąc już istnieje")
+                return
+            
+            goal["data"][mk] = {p["id"]: {"planned": 0.0, "actual": 0.0} for p in goal["persons"]}
+            dm.save_shared_goals(self.goals)
+            dialog.destroy()
+            self.refresh()
+            
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=20)
+        ctk.CTkButton(btn_frame, text="Anuluj", fg_color=COLOR_SURFACE_2, text_color=COLOR_TEXT, hover_color=COLOR_SURFACE, command=dialog.destroy).pack(side="left", expand=True, padx=5)
+        ctk.CTkButton(btn_frame, text="Dodaj", fg_color=COLOR_PRIMARY, text_color=COLOR_SURFACE, command=save).pack(side="right", expand=True, padx=5)
+
             
     def refresh(self):
+        canvas = getattr(self.scroll, "_parent_canvas", None)
+        scroll_pos = canvas.yview()[0] if canvas else 0.0
+
         for w in self.scroll.winfo_children():
             w.destroy()
         self.cell_vars = {}
@@ -4338,7 +4398,8 @@ class SharedGoalsView(ctk.CTkFrame):
             ctk.CTkLabel(grid, text=t("shared.planned"), font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=1, column=col_idx, padx=2, pady=2)
             ctk.CTkLabel(grid, text=t("shared.actual"), font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=1, column=col_idx+1, padx=2, pady=2)
             col_idx += 2
-            ctk.CTkLabel(grid, text=t("shared.status"), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=0, column=col_idx, rowspan=2, padx=5, pady=5)
+            status_header_text = "Akcje" if self.editing else t("shared.status")
+            ctk.CTkLabel(grid, text=status_header_text, font=FONT_LABEL, text_color=COLOR_TEXT_MUTED, width=80).grid(row=0, column=col_idx, rowspan=2, padx=5, pady=5)
             
             months = sorted(goal["data"].keys())
             row_idx = 2
@@ -4389,13 +4450,22 @@ class SharedGoalsView(ctk.CTkFrame):
                 ctk.CTkLabel(grid, text=f"{month_actual_sum:,.0f}", font=FONT_MONO, text_color=comb_color, width=80).grid(row=row_idx, column=col_idx+1, padx=2, pady=5)
                 col_idx += 2
 
-                # Status indicator
-                status_color = COLOR_SUCCESS if month_actual_sum >= month_planned_sum and month_planned_sum > 0 else COLOR_ERROR if month_actual_sum > 0 else COLOR_BORDER
-                indicator = ctk.CTkFrame(grid, width=16, height=16, corner_radius=8, fg_color=status_color)
-                indicator.grid(row=row_idx, column=col_idx, padx=5, pady=5)
+                if self.editing:
+                    del_btn = ctk.CTkButton(grid, text="×", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda g=goal, m=mk: self.delete_month(g, m))
+                    del_btn.grid(row=row_idx, column=col_idx, padx=5, pady=5)
+                else:
+                    # Status indicator
+                    status_color = COLOR_SUCCESS if month_actual_sum >= month_planned_sum and month_planned_sum > 0 else COLOR_ERROR if month_actual_sum > 0 else COLOR_BORDER
+                    indicator = ctk.CTkFrame(grid, width=16, height=16, corner_radius=8, fg_color=status_color)
+                    indicator.grid(row=row_idx, column=col_idx, padx=5, pady=5)
                 
                 row_idx += 1
                 
+            if self.editing:
+                btn_add = ctk.CTkButton(grid, text="+ Dodaj miesiąc", fg_color="transparent", text_color=COLOR_PRIMARY, border_width=1, border_color=COLOR_PRIMARY, command=lambda g=goal: self.add_month(g))
+                btn_add.grid(row=row_idx, column=0, columnspan=col_idx+1, pady=(10, 5))
+                row_idx += 1
+
             # Totals Row
             # Draw separator
             sep = ctk.CTkFrame(grid, height=1, fg_color=COLOR_BORDER)
@@ -4429,6 +4499,10 @@ class SharedGoalsView(ctk.CTkFrame):
             
             avail_color = COLOR_SUCCESS if available >= 0 else COLOR_ERROR
             ctk.CTkLabel(summary_frame, text=f"Dostępne: {available:,.2f} PLN", font=FONT_TITLE, text_color=avail_color).pack(side="right", padx=16, pady=12)
+
+        if canvas:
+            self.update_idletasks()
+            canvas.yview_moveto(scroll_pos)
 
     def open_withdraw_modal(self, goal):
         dialog = ctk.CTkToplevel(self)
