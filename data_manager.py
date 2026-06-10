@@ -12,6 +12,18 @@ from theme import CATEGORY_COLORS, COLOR_TEXT_FAINT
 DATA_DIR = Path("data")
 CONFIG_FILE = Path("config.json")
 
+EMERGENCY_FUND_GOALS = {
+    "3msc_zycia": "3msc życia",
+    "6msc_zycia": "6msc życia",
+    "3msc_kredytu": "3msc kredytu",
+    "6msc_kredytu": "6msc kredytu",
+    "3msc_zycia_kredytu": "3msc życia + kredytu",
+    "4msc_zycia_kredytu": "4msc życia + kredytu",
+    "5msc_zycia_kredytu": "5msc życia + kredytu",
+    "6msc_zycia_kredytu": "6msc życia + kredytu",
+    "3msc_wyplaty": "3msc wypłaty",
+    "6msc_wyplaty": "6msc wypłaty",
+}
 
 def generate_id():
     return str(uuid.uuid4())
@@ -1009,6 +1021,11 @@ def get_emergency_fund_settings():
         except (ValueError, KeyError, TypeError):
             allocations = {"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0}
             
+        try:
+            custom_goals = json.loads(r["custom_goals"])
+        except (ValueError, KeyError, TypeError):
+            custom_goals = []
+
         res[r["mode"]] = {
             "salary": r["salary"],
             "mortgage": r["mortgage"],
@@ -1018,18 +1035,20 @@ def get_emergency_fund_settings():
             "future_goal": r["future_goal"],
             "cash_allocated": r["cash_allocated"],
             "allocations": allocations,
-            "manual_target": r["manual_target"] if "manual_target" in r.keys() else None
+            "manual_target": r["manual_target"] if "manual_target" in r.keys() else None,
+            "custom_goals": custom_goals
         }
     return res
 
 def save_emergency_fund_settings(mode, data):
     conn = get_connection()
     allocs = data.get("allocations", {"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0})
+    custom_goals = data.get("custom_goals", [])
     conn.execute(
         """UPDATE emergency_fund_settings 
-           SET salary = ?, mortgage = ?, living_expenses = ?, selected_goal = ?, actual_saved = ?, future_goal = ?, cash_allocated = ?, allocations = ?, manual_target = ?
+           SET salary = ?, mortgage = ?, living_expenses = ?, selected_goal = ?, actual_saved = ?, future_goal = ?, cash_allocated = ?, allocations = ?, manual_target = ?, custom_goals = ?
            WHERE mode = ?""",
-        (data["salary"], data["mortgage"], data["living_expenses"], data["selected_goal"], data["actual_saved"], data.get("future_goal", "6msc_zycia"), data.get("cash_allocated", 0.0), json.dumps(allocs), data.get("manual_target"), mode)
+        (data["salary"], data["mortgage"], data["living_expenses"], data["selected_goal"], data["actual_saved"], data.get("future_goal", "6msc_zycia"), data.get("cash_allocated", 0.0), json.dumps(allocs), data.get("manual_target"), json.dumps(custom_goals), mode)
     )
     conn.commit()
 
@@ -1042,8 +1061,26 @@ def get_emergency_fund_transactions(mode):
     return [{"id": r["id"], "date": r["date"], "type": r["type"], "amount": r["amount"], "note": r["note"]} for r in rows]
 
 def _recalculate_emergency_fund_actual(conn, mode):
-    row = conn.execute("SELECT amount FROM emergency_fund_transactions WHERE mode = ? AND type = 'snapshot' ORDER BY date DESC, created_at DESC LIMIT 1", (mode,)).fetchone()
-    total = row["amount"] if row else 0.0
+    snap_row = conn.execute("SELECT amount, date, created_at FROM emergency_fund_transactions WHERE mode = ? AND type = 'snapshot' ORDER BY date DESC, created_at DESC LIMIT 1", (mode,)).fetchone()
+    total = snap_row["amount"] if snap_row else 0.0
+    
+    if snap_row:
+        rows = conn.execute("""
+            SELECT type, amount FROM emergency_fund_transactions 
+            WHERE mode = ? AND type != 'snapshot' 
+            AND (date > ? OR (date = ? AND created_at > ?))
+        """, (mode, snap_row["date"], snap_row["date"], snap_row["created_at"])).fetchall()
+    else:
+        rows = conn.execute("SELECT type, amount FROM emergency_fund_transactions WHERE mode = ? AND type != 'snapshot'", (mode,)).fetchall()
+        
+    for r in rows:
+        if r["type"] == "deposit":
+            total += r["amount"]
+        elif r["type"] == "withdrawal":
+            total -= r["amount"]
+            
+    total = max(0.0, total)
+    
     conn.execute("UPDATE emergency_fund_settings SET actual_saved = ? WHERE mode = ?", (total, mode))
     return total
 

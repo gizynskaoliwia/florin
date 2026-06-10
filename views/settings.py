@@ -511,12 +511,6 @@ class SettingsView(ctk.CTkFrame):
         if self.emergency_fund_var.get() != "true":
             return
 
-        goal_options = [
-            "3msc_kredytu", "3msc_zycia", "6msc_kredytu",
-            "3msc_zycia_kredytu", "4msc_zycia_kredytu", "5msc_zycia_kredytu", "6msc_zycia_kredytu",
-            "3msc_wyplaty", "6msc_wyplaty"
-        ]
-
         def _build_form(parent, title, s_var, m_var, l_var, a_var, g_var, f_var, alloc_list):
             f = ctk.CTkFrame(parent, fg_color="transparent")
             f.pack(fill="x", pady=(10, 20))
@@ -532,8 +526,8 @@ class SettingsView(ctk.CTkFrame):
                 self._ef_label(f, t("Mortgage/Loan (Kredyt)"), f"{float(m_var.get()):,.2f} PLN")
                 self._ef_label(f, t("Living Expenses (Do życia)"), f"{float(l_var.get()):,.2f} PLN")
                 self._ef_label(f, t("Actual Saved:"), f"{float(a_var.get()):,.2f} PLN")
-                self._ef_label(f, t("Active Goal:"), g_var.get())
-                self._ef_label(f, t("Future Goal:"), f_var.get())
+                self._ef_label(f, t("Active Goal:"), dm.EMERGENCY_FUND_GOALS.get(g_var.get(), g_var.get()))
+                self._ef_label(f, t("Future Goal:"), dm.EMERGENCY_FUND_GOALS.get(f_var.get(), f_var.get()))
                 
                 ctk.CTkLabel(f, text=t("Asset Allocations"), font=FONT_TITLE, text_color=COLOR_TEXT_MUTED).pack(anchor="w", pady=(15, 5))
                 for al in alloc_list:
@@ -552,12 +546,12 @@ class SettingsView(ctk.CTkFrame):
                 gf = ctk.CTkFrame(f, fg_color="transparent")
                 gf.pack(fill="x", pady=5)
                 ctk.CTkLabel(gf, text=t("Active Goal:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
-                ctk.CTkOptionMenu(gf, variable=g_var, values=goal_options).pack(side="left")
+                ctk.CTkOptionMenu(gf, variable=g_var, values=list(dm.EMERGENCY_FUND_GOALS.values())).pack(side="left")
                 
                 ff = ctk.CTkFrame(f, fg_color="transparent")
                 ff.pack(fill="x", pady=5)
                 ctk.CTkLabel(ff, text=t("Future Goal:"), font=FONT_TITLE, width=150, anchor="w").pack(side="left")
-                ctk.CTkOptionMenu(ff, variable=f_var, values=goal_options).pack(side="left")
+                ctk.CTkOptionMenu(ff, variable=f_var, values=list(dm.EMERGENCY_FUND_GOALS.values())).pack(side="left")
                 
                 ctk.CTkLabel(f, text=t("Asset Allocations (%)"), font=FONT_TITLE, text_color=COLOR_TEXT_MUTED).pack(anchor="w", pady=(15, 5))
                 for al in alloc_list:
@@ -584,8 +578,8 @@ class SettingsView(ctk.CTkFrame):
         self.ef_p_mortgage_var.set(str(p_data.get("mortgage", 0.0)))
         self.ef_p_living_var.set(str(p_data.get("living_expenses", 0.0)))
         self.ef_p_actual_var.set(str(p_data.get("actual_saved", 0.0)))
-        self.ef_p_goal_var.set(p_data.get("selected_goal", "3msc_zycia_kredytu"))
-        self.ef_p_future_goal_var.set(p_data.get("future_goal", "6msc_zycia"))
+        self.ef_p_goal_var.set(dm.EMERGENCY_FUND_GOALS.get(p_data.get("selected_goal", "3msc_zycia_kredytu"), "3msc życia + kredytu"))
+        self.ef_p_future_goal_var.set(dm.EMERGENCY_FUND_GOALS.get(p_data.get("future_goal", "6msc_zycia"), "6msc życia"))
         self.p_allocations = [{"name": ctk.StringVar(value=k), "pct": ctk.StringVar(value=str(v))} for k, v in p_data.get("allocations", {}).items()]
 
         s_data = settings.get("shared", {})
@@ -593,12 +587,13 @@ class SettingsView(ctk.CTkFrame):
         self.ef_s_mortgage_var.set(str(s_data.get("mortgage", 0.0)))
         self.ef_s_living_var.set(str(s_data.get("living_expenses", 0.0)))
         self.ef_s_actual_var.set(str(s_data.get("actual_saved", 0.0)))
-        self.ef_s_goal_var.set(s_data.get("selected_goal", "3msc_zycia_kredytu"))
-        self.ef_s_future_goal_var.set(s_data.get("future_goal", "6msc_zycia"))
+        self.ef_s_goal_var.set(dm.EMERGENCY_FUND_GOALS.get(s_data.get("selected_goal", "3msc_zycia_kredytu"), "3msc życia + kredytu"))
+        self.ef_s_future_goal_var.set(dm.EMERGENCY_FUND_GOALS.get(s_data.get("future_goal", "6msc_zycia"), "6msc życia"))
         self.s_allocations = [{"name": ctk.StringVar(value=k), "pct": ctk.StringVar(value=str(v))} for k, v in s_data.get("allocations", {}).items()]
 
     def save_ef_settings(self):
         try:
+            rev_goals = {v: k for k, v in dm.EMERGENCY_FUND_GOALS.items()}
             p_old = dm.get_emergency_fund_settings().get("personal", {})
             p_allocs = {}
             for a in self.p_allocations:
@@ -611,10 +606,12 @@ class SettingsView(ctk.CTkFrame):
                 "mortgage": float(self.ef_p_mortgage_var.get().replace(",", ".")),
                 "living_expenses": float(self.ef_p_living_var.get().replace(",", ".")),
                 "actual_saved": float(self.ef_p_actual_var.get().replace(",", ".")),
-                "selected_goal": self.ef_p_goal_var.get(),
-                "future_goal": self.ef_p_future_goal_var.get(),
+                "selected_goal": rev_goals.get(self.ef_p_goal_var.get(), self.ef_p_goal_var.get()),
+                "future_goal": rev_goals.get(self.ef_p_future_goal_var.get(), self.ef_p_future_goal_var.get()),
+                "allocations": p_allocs,
                 "cash_allocated": p_old.get("cash_allocated", 0.0),
-                "allocations": p_allocs
+                "manual_target": p_old.get("manual_target", None),
+                "custom_goals": p_old.get("custom_goals", [])
             }
             dm.save_emergency_fund_settings("personal", p_data)
 
@@ -630,10 +627,12 @@ class SettingsView(ctk.CTkFrame):
                 "mortgage": float(self.ef_s_mortgage_var.get().replace(",", ".")),
                 "living_expenses": float(self.ef_s_living_var.get().replace(",", ".")),
                 "actual_saved": float(self.ef_s_actual_var.get().replace(",", ".")),
-                "selected_goal": self.ef_s_goal_var.get(),
-                "future_goal": self.ef_s_future_goal_var.get(),
+                "selected_goal": rev_goals.get(self.ef_s_goal_var.get(), self.ef_s_goal_var.get()),
+                "future_goal": rev_goals.get(self.ef_s_future_goal_var.get(), self.ef_s_future_goal_var.get()),
+                "allocations": s_allocs,
                 "cash_allocated": s_old.get("cash_allocated", 0.0),
-                "allocations": s_allocs
+                "manual_target": s_old.get("manual_target", None),
+                "custom_goals": s_old.get("custom_goals", [])
             }
             dm.save_emergency_fund_settings("shared", s_data)
 

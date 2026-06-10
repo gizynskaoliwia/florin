@@ -113,6 +113,12 @@ class EmergencyFundView(ctk.CTkFrame):
         for name, pct in allocs.items():
             alloc_frames.append(self.make_row(asset_card, name, "0.00"))
 
+        goals_card = ctk.CTkFrame(section_frame, fg_color=theme.COLOR_SURFACE, corner_radius=16, border_width=1, border_color=theme.COLOR_BORDER)
+        goals_card.pack(fill="x", pady=(20, 0))
+        ctk.CTkLabel(goals_card, text=tr_text("CELE SZCZEGÓŁOWE"), font=theme.FONT_SECTION, text_color=theme.COLOR_TEXT).pack(anchor="w", padx=20, pady=(20, 10))
+        goals_list_frame = ctk.CTkFrame(goals_card, fg_color="transparent")
+        goals_list_frame.pack(fill="x", padx=20, pady=(0, 20))
+
         refs = {
             "mode": mode,
             "actual_frame": actual_frame,
@@ -124,7 +130,9 @@ class EmergencyFundView(ctk.CTkFrame):
             "cash_var": cash_var,
             "cash_entry": cash_entry,
             "target_no_cash_frame": target_no_cash_frame,
-            "alloc_frames": alloc_frames
+            "alloc_frames": alloc_frames,
+            "goals_list_frame": goals_list_frame,
+            "goals_vars": []
         }
         
         self.section_refs.append(refs)
@@ -360,6 +368,14 @@ class EmergencyFundView(ctk.CTkFrame):
                     else:
                         data["manual_target"] = None
                         
+                    for n_var, orig_idx in refs.get("goals_vars", []):
+                        g_name = n_var.get().strip()
+                        rev_goals = {v: k for k, v in dm.EMERGENCY_FUND_GOALS.items()}
+                        g_key = rev_goals.get(g_name, g_name)
+                        data["custom_goals"][orig_idx] = {"name": g_key, "amount": 0.0}
+                    
+                    data["custom_goals"] = [cg for cg in data["custom_goals"] if cg["name"]]
+                        
                     dm.save_emergency_fund_settings(mode, data)
                 except ValueError:
                     pass
@@ -442,3 +458,150 @@ class EmergencyFundView(ctk.CTkFrame):
                 refs["cash_var"].set(f"{data.get('cash_allocated', 0.0):.0f}")
                 
             self.refresh_asset_allocation(data, refs)
+            self.refresh_custom_goals(mode, data, refs)
+
+    def refresh_custom_goals(self, mode, data, refs):
+        container = refs["goals_list_frame"]
+        for w in container.winfo_children():
+            w.destroy()
+            
+        actual_saved = data.get("actual_saved", 0.0)
+        
+        combined_goals = []
+        
+        goal_labels = dm.EMERGENCY_FUND_GOALS
+        
+        system_goal_keys = list(goal_labels.keys())
+        active_goal_key = data.get("selected_goal", "3msc_zycia")
+        future_goal_key = data.get("future_goal", "6msc_zycia")
+        
+        # Evaluate all system goals
+        for key in system_goal_keys:
+            # Temporary mock data dict to calculate target for specific key
+            temp_data = dict(data)
+            temp_data["selected_goal"] = key
+            target = self.calculate_target(temp_data, is_future=False)
+            
+            # Include if it's completed OR if it's the explicitly selected active/future goal
+            is_active = (key == active_goal_key)
+            is_future = (key == future_goal_key)
+            
+            if target > 0 and (actual_saved >= target or is_active or is_future):
+                name_prefix = ""
+                if is_active:
+                    name_prefix = "Cel Aktywny: "
+                elif is_future:
+                    name_prefix = "Cel Przyszły: "
+                    
+                combined_goals.append({
+                    "name": f"{name_prefix}{goal_labels.get(key, key)}", 
+                    "target": target, 
+                    "is_system": True,
+                    "original_index": -1
+                })
+            
+        custom_goals = data.get("custom_goals", [])
+        for i, cg in enumerate(custom_goals):
+            goal_key = cg.get("name", list(dm.EMERGENCY_FUND_GOALS.keys())[0])
+            
+            temp_data = dict(data)
+            temp_data["selected_goal"] = goal_key
+            target = self.calculate_target(temp_data, is_future=False)
+            
+            display_name = goal_labels.get(goal_key, goal_key)
+            
+            combined_goals.append({
+                "key": goal_key,
+                "name": display_name,
+                "target": target,
+                "is_system": False,
+                "original_index": i
+            })
+            
+        # Remove duplicates if any (e.g., if a custom goal matches a system goal exactly, though unlikely. Better to just deduplicate by name)
+        seen_names = set()
+        unique_goals = []
+        for g in combined_goals:
+            if g["name"] not in seen_names:
+                unique_goals.append(g)
+                seen_names.add(g["name"])
+                
+        unique_goals.sort(key=lambda x: x["target"])
+        combined_goals = unique_goals
+        
+        refs["goals_vars"] = []
+        previous_target = 0.0
+        
+        for goal in combined_goals:
+            target = goal["target"]
+            if actual_saved >= target:
+                goal["status_text"] = "✓ spełnione"
+                goal["status_color"] = theme.COLOR_SUCCESS
+                goal["progress_str"] = " (100%)"
+            elif actual_saved > previous_target:
+                goal["status_text"] = "w trakcie"
+                goal["status_color"] = theme.COLOR_WARNING
+                goal["progress_str"] = f" (Brakuje: {target - actual_saved:,.2f} PLN)"
+            else:
+                goal["status_text"] = "niezaczęte"
+                goal["status_color"] = theme.COLOR_TEXT_MUTED
+                goal["progress_str"] = f" (Brakuje: {target - actual_saved:,.2f} PLN)"
+            previous_target = target
+
+        completed_goals = [g for g in combined_goals if g["status_text"] == "✓ spełnione"]
+        active_goals = [g for g in combined_goals if g["status_text"] != "✓ spełnione"]
+
+        def render_goal(goal, parent, dim=False):
+            target = goal["target"]
+            is_system = goal["is_system"]
+            row = ctk.CTkFrame(parent, fg_color="transparent")
+            row.pack(fill="x", pady=4)
+            
+            if self.editing and not is_system:
+                name_var = ctk.StringVar(value=dm.EMERGENCY_FUND_GOALS.get(goal.get("key", goal["name"]), goal["name"]))
+                ctk.CTkOptionMenu(row, variable=name_var, values=list(dm.EMERGENCY_FUND_GOALS.values()), width=200).pack(side="left", padx=(0, 10))
+                ctk.CTkLabel(row, text=f"{target:,.2f} PLN", font=theme.FONT_MONO, text_color=theme.COLOR_TEXT).pack(side="left")
+                
+                def del_goal(idx=goal["original_index"], m=mode):
+                    data["custom_goals"].pop(idx)
+                    dm.save_emergency_fund_settings(m, data)
+                    self.refresh()
+                
+                ctk.CTkButton(row, text="X", width=30, fg_color=theme.COLOR_EXPENSE, hover_color=theme.COLOR_EXPENSE, command=del_goal).pack(side="right", padx=(10, 0))
+                refs["goals_vars"].append((name_var, goal["original_index"]))
+            else:
+                name_disp = goal["name"]
+                if self.editing and is_system:
+                    name_disp += " (Z ustawień)"
+                
+                text_color = theme.COLOR_TEXT_MUTED if dim else theme.COLOR_TEXT
+                ctk.CTkLabel(row, text=name_disp, font=theme.FONT_BODY, text_color=text_color).pack(side="left")
+                ctk.CTkLabel(row, text=f"{target:,.2f} PLN", font=theme.FONT_MONO, text_color=text_color).pack(side="right", padx=(10, 0))
+                
+                status_lbl = ctk.CTkLabel(row, text=f"{goal['status_text']}{goal['progress_str']}", font=theme.FONT_MONO_SM_BOLD, text_color=goal["status_color"])
+                status_lbl.pack(side="right", padx=(20, 10))
+
+        for goal in active_goals:
+            render_goal(goal, container)
+            
+        if completed_goals:
+            sep = ctk.CTkFrame(container, fg_color=theme.COLOR_BORDER, height=1)
+            sep.pack(fill="x", pady=(15, 10))
+            ctk.CTkLabel(container, text="ZREALIZOWANE", font=theme.FONT_LABEL, text_color=theme.COLOR_TEXT_MUTED).pack(anchor="w", pady=(0, 5))
+            for goal in completed_goals:
+                render_goal(goal, container, dim=True)
+                
+        if self.editing:
+            add_row = ctk.CTkFrame(container, fg_color="transparent")
+            add_row.pack(fill="x", pady=(10, 0))
+            def add_new(m=mode):
+                for n_var, orig_idx in refs.get("goals_vars", []):
+                    g_name = n_var.get().strip()
+                    rev_goals = {v: k for k, v in dm.EMERGENCY_FUND_GOALS.items()}
+                    g_key = rev_goals.get(g_name, g_name)
+                    data["custom_goals"][orig_idx] = {"name": g_key, "amount": 0.0}
+                
+                data.setdefault("custom_goals", []).append({"name": list(dm.EMERGENCY_FUND_GOALS.keys())[0], "amount": 0.0})
+                dm.save_emergency_fund_settings(m, data)
+                self.refresh()
+            ctk.CTkButton(add_row, text="+ Dodaj cel", width=100, fg_color=theme.COLOR_SURFACE_2, text_color=theme.COLOR_TEXT, hover_color=theme.COLOR_BORDER, command=add_new).pack(side="left")

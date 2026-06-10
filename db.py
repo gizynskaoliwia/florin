@@ -62,6 +62,8 @@ def _init_schema(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE emergency_fund_settings ADD COLUMN allocations TEXT NOT NULL DEFAULT '{\"80% CELU OBLIGACJE\": 80.0, \"20% CELU KONTO OSZCZ.\": 20.0}'")
     if "manual_target" not in columns:
         conn.execute("ALTER TABLE emergency_fund_settings ADD COLUMN manual_target REAL DEFAULT NULL")
+    if "custom_goals" not in columns:
+        conn.execute("ALTER TABLE emergency_fund_settings ADD COLUMN custom_goals TEXT NOT NULL DEFAULT '[]'")
 
     if not transactions_table_exists:
         import uuid
@@ -294,7 +296,8 @@ CREATE TABLE IF NOT EXISTS emergency_fund_settings (
     future_goal TEXT NOT NULL DEFAULT '6msc_zycia',
     cash_allocated REAL NOT NULL DEFAULT 0.0,
     allocations TEXT NOT NULL DEFAULT '{"80% CELU OBLIGACJE": 80.0, "20% CELU KONTO OSZCZ.": 20.0}',
-    manual_target REAL DEFAULT NULL
+    manual_target REAL DEFAULT NULL,
+    custom_goals TEXT NOT NULL DEFAULT '[]'
 );
 
 -- Emergency fund transactions

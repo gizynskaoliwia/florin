@@ -56,6 +56,7 @@ class CashFlowView(ctk.CTkFrame):
         self.shared_assumed_var = ctk.StringVar(value="0.00")
         self.saved_assumed_var = ctk.StringVar(value="0.00")
         self.shared_actual_var = ctk.StringVar(value="0.00")
+        self.saved_actual_var = ctk.StringVar(value="0.00")
         self.saved_actual_lbl = None
         self.total_topup_lbl = None
         self.net_income_lbl = None
@@ -88,6 +89,7 @@ class CashFlowView(ctk.CTkFrame):
         net_income = dm.get_net_income(data)
         total_topup = sum(max(0.0, target["target"] - cf.get("current_accounts", {}).get(target["id"], {}).get("balance", 0.0)) for target in targets)
         shared_actual = cf.get("shared_actual", 0.0)
+        saved_actual = cf.get("saved_actual", 0.0)
         actual_saved = net_income - total_topup - shared_actual
 
         result = make_card(self.scroll, height=198)
@@ -216,11 +218,12 @@ class CashFlowView(ctk.CTkFrame):
         self.shared_assumed_var.set(f"{cf.get('shared_assumed', 0.0):.2f}")
         self.saved_assumed_var.set(f"{cf.get('saved_assumed', 0.0):.2f}")
         self.shared_actual_var.set(f"{cf.get('shared_actual', 0.0):.2f}")
+        self.saved_actual_var.set(f"{cf.get('saved_actual', 0.0):.2f}")
 
         rows = [
             (tx("Calculated"), format_money(shared_calc, suffix=False), format_money(saved_calc, suffix=False)),
             (tx("Assumed"), self.shared_assumed_var, self.saved_assumed_var),
-            (tx("Actual"), self.shared_actual_var, None),
+            (tx("Actual"), self.shared_actual_var, self.saved_actual_var),
         ]
         ctk.CTkLabel(goals_grid, text="", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).grid(row=0, column=0, sticky="w", padx=4, pady=4)
         ctk.CTkLabel(goals_grid, text=tx("Shared"), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).grid(row=0, column=1, sticky="ew", padx=4, pady=4)
@@ -238,7 +241,7 @@ class CashFlowView(ctk.CTkFrame):
             if saved_val is None:
                 self.net_income_lbl = ctk.CTkLabel(goals_grid, text=format_money(net_income, suffix=False), font=FONT_MONO, text_color=COLOR_INCOME, fg_color=COLOR_SURFACE_2, corner_radius=7, height=30)
                 self.net_income_lbl.grid(row=row_idx, column=2, sticky="ew", padx=8, pady=5)
-            elif self.editing and row_idx == 2:
+            elif self.editing and row_idx in (2, 3):
                 saved_entry = ctk.CTkEntry(goals_grid, textvariable=saved_val, font=FONT_MONO, height=30, fg_color=COLOR_SURFACE, border_color=COLOR_BORDER, justify="center")
                 saved_entry.grid(row=row_idx, column=2, sticky="ew", padx=8, pady=5)
                 saved_entry.bind("<KeyRelease>", self.calculate)
@@ -328,6 +331,9 @@ class CashFlowView(ctk.CTkFrame):
             shared_actual = parse_money(self.shared_actual_var.get())
             cf["shared_actual"] = shared_actual
 
+            saved_actual = parse_money(self.saved_actual_var.get())
+            cf["saved_actual"] = saved_actual
+
             shared_assumed = parse_money(self.shared_assumed_var.get())
             cf["shared_assumed"] = shared_assumed
 
@@ -341,7 +347,7 @@ class CashFlowView(ctk.CTkFrame):
                 self.saved_actual_lbl.configure(text=format_money(actual_saved, suffix=False), text_color=color)
             if self.cashflow_formula_lbl:
                 self.cashflow_formula_lbl.configure(
-                    text=f"{ui_text('Net', 'Netto')} {format_money(net_income, suffix=False)} − {ui_text('top-up', 'uzupełn.') } {format_money(total_topup, suffix=False)}"
+                    text=f"{ui_text('Net', 'Netto')} {format_money(net_income, suffix=False)} − {ui_text('top-ups', 'uzupełn.')} {format_money(total_topup, suffix=False)} − {ui_text('shared', 'wspólne')} {format_money(shared_actual, suffix=False)}"
                 )
 
             self.controller.save_data()
