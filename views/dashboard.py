@@ -37,8 +37,12 @@ class DashboardView(ctk.CTkFrame):
         month_box = ctk.CTkFrame(self.topbar, fg_color=COLOR_SURFACE, corner_radius=RADIUS_BUTTON, border_width=1, border_color=COLOR_BORDER)
         month_box.pack(side="right", padx=8)
         ctk.CTkButton(month_box, text="‹", width=28, height=28, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(-1)).pack(side="left", padx=(4, 0), pady=3)
-        self.month_lbl = ctk.CTkLabel(month_box, text="", font=FONT_MONO, text_color=COLOR_TEXT, width=112)
-        self.month_lbl.pack(side="left")
+        mid = ctk.CTkFrame(month_box, fg_color="transparent")
+        mid.pack(side="left", padx=6, pady=2)
+        self.month_lbl = ctk.CTkLabel(mid, text="", font=FONT_LABEL, text_color=COLOR_TEXT)
+        self.month_lbl.pack(anchor="center")
+        self.month_sub_lbl = ctk.CTkLabel(mid, text="", font=FONT_MONO_SM, text_color=COLOR_TEXT_MUTED)
+        self.month_sub_lbl.pack(anchor="center")
         ctk.CTkButton(month_box, text="›", width=28, height=28, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(1)).pack(side="left", padx=(0, 4), pady=3)
 
         ctk.CTkFrame(self, height=1, fg_color=COLOR_BORDER).pack(fill="x")
@@ -56,6 +60,7 @@ class DashboardView(ctk.CTkFrame):
         total_exp = dm.get_total_expenses(data)
         remaining = sum(dm.get_remaining_amount(data, cat["id"]) for cat in cats)
         self.month_lbl.configure(text=month_year_label(self.controller.current_month, upper=True))
+        self.month_sub_lbl.configure(text=dm.get_budget_period_str(self.controller.current_month))
 
         hero_grid = ctk.CTkFrame(self.scroll, fg_color="transparent")
         hero_grid.pack(fill="x")
@@ -230,7 +235,8 @@ class DashboardView(ctk.CTkFrame):
         head = ctk.CTkFrame(card, fg_color="transparent")
         head.pack(fill="x", padx=24, pady=(18, 12))
         current_month = datetime.strptime(self.controller.current_month, "%Y-%m")
-        recent_title = f"{tx('Recent expenses')} · {month_full(current_month.month)}"
+        period_str = dm.get_budget_period_str(self.controller.current_month)
+        recent_title = f"{tx('Recent expenses')} · {month_full(current_month.month)} ({period_str})"
         ctk.CTkLabel(head, text=recent_title, font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
         ctk.CTkButton(
             head,

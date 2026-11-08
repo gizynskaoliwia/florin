@@ -2,7 +2,8 @@
 import uuid
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
+import re
 import msoffcrypto
 import openpyxl
 import io
@@ -55,7 +56,7 @@ def get_config():
     config = {r["key"]: r["value"] for r in rows}
     
     # Defaults if missing
-    if "last_month" not in config: config["last_month"] = datetime.now().strftime("%Y-%m")
+    if "last_month" not in config: config["last_month"] = get_current_budget_month()
     if "theme" not in config: config["theme"] = "light"
     if "language" not in config: config["language"] = "en"
     
@@ -154,6 +155,79 @@ def delete_cashflow_target(target_id):
 
 
 # --- Month Data ---
+def date_to_budget_month(val) -> str:
+    """Map any date (str, date, datetime) to its budget month key ('YYYY-MM').
+    
+    A budget period starts on the 15th of the month and ends on the 14th of the following month.
+    - Dates with day >= 15 belong to that month (e.g. 15/04/2026 -> '2026-04').
+    - Dates with day < 15 belong to the previous month (e.g. 14/05/2026 -> '2026-04', 02/01/2026 -> '2025-12').
+    """
+    if isinstance(val, (datetime, date)):
+        year, month, day = val.year, val.month, val.day
+    elif isinstance(val, str):
+        val = val.strip()
+        # Try DD/MM/YYYY or DD.MM.YYYY
+        m = re.match(r"^(\d{1,2})[/\.-](\d{1,2})[/\.-](\d{4})$", val)
+        if m:
+            day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        else:
+            # Try YYYY-MM-DD or YYYY/MM/DD
+            m2 = re.match(r"^(\d{4})[/\.-](\d{1,2})[/\.-](\d{1,2})$", val)
+            if m2:
+                year, month, day = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
+            else:
+                m3 = re.match(r"^(\d{4})-(\d{2})$", val)
+                if m3:
+                    return val
+                raise ValueError(f"Unrecognized date format: {val}")
+    else:
+        raise TypeError(f"Expected str, date or datetime, got {type(val)}")
+
+    if day >= 15:
+        return f"{year:04d}-{month:02d}"
+    else:
+        if month == 1:
+            return f"{year-1:04d}-12"
+        else:
+            return f"{year:04d}-{month-1:02d}"
+
+
+def get_current_budget_month(dt=None) -> str:
+    """Return the active budget month key for current time (or given dt)."""
+    if dt is None:
+        dt = datetime.now()
+    return date_to_budget_month(dt)
+
+
+def get_budget_period_str(month_str: str) -> str:
+    """Return human readable period, e.g. '15.04 – 14.05'."""
+    try:
+        year, month = map(int, month_str.split("-"))
+        next_m = 1 if month == 12 else month + 1
+        return f"15.{month:02d} – 14.{next_m:02d}"
+    except Exception:
+        return ""
+
+
+def get_budget_month_range(month_str: str):
+    """Return (start_date, end_date) as date objects for the given budget month."""
+    year, month = map(int, month_str.split("-"))
+    start_date = date(year, month, 15)
+    if month == 12:
+        end_date = date(year + 1, 1, 14)
+    else:
+        end_date = date(year, month + 1, 14)
+    return start_date, end_date
+
+
+def is_date_in_budget_month(date_val, month_str: str) -> bool:
+    """Check if a date falls within the budget month."""
+    try:
+        return date_to_budget_month(date_val) == month_str
+    except Exception:
+        return False
+
+
 def _get_previous_month_str(month_str):
     year, month = int(month_str[:4]), int(month_str[5:7])
     month -= 1

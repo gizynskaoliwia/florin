@@ -27,8 +27,12 @@ class IncomeView(ctk.CTkFrame):
         month_box = ctk.CTkFrame(self.actions, fg_color=COLOR_SURFACE, corner_radius=RADIUS_BUTTON, border_width=1, border_color=COLOR_BORDER)
         month_box.pack(side="left", padx=(0, 10))
         ctk.CTkButton(month_box, text="‹", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(-1)).pack(side="left", padx=(4, 0), pady=3)
-        self.month_lbl = ctk.CTkLabel(month_box, text="", font=FONT_MONO, text_color=COLOR_TEXT, width=118)
-        self.month_lbl.pack(side="left")
+        mid = ctk.CTkFrame(month_box, fg_color="transparent")
+        mid.pack(side="left", padx=6, pady=2)
+        self.month_lbl = ctk.CTkLabel(mid, text="", font=FONT_LABEL, text_color=COLOR_TEXT)
+        self.month_lbl.pack(anchor="center")
+        self.month_sub_lbl = ctk.CTkLabel(mid, text="", font=FONT_MONO_SM, text_color=COLOR_TEXT_MUTED)
+        self.month_sub_lbl.pack(anchor="center")
         ctk.CTkButton(month_box, text="›", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(1)).pack(side="left", padx=(0, 4), pady=3)
         self.edit_btn = ctk.CTkButton(self.actions, text=tx("✎ Edit"), width=86, height=34, fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_SOFT, command=self.toggle_edit)
         self.edit_btn.pack(side="left", padx=(0, 8))
@@ -561,7 +565,8 @@ class IncomeView(ctk.CTkFrame):
 
     def refresh(self):
         self.month_lbl.configure(text=month_year_label(self.controller.current_month, upper=True))
-        self.hero_kicker.configure(text=f"● {ui_text('NET', 'NETTO')} · {month_year_label(self.controller.current_month, upper=True)}")
+        self.month_sub_lbl.configure(text=dm.get_budget_period_str(self.controller.current_month))
+        self.hero_kicker.configure(text=f"● {ui_text('NET', 'NETTO')} · {month_year_label(self.controller.current_month, upper=True)} ({dm.get_budget_period_str(self.controller.current_month)})")
         if not self.cat_built:
             self.build_cat_rows()
         self.build_items_list()

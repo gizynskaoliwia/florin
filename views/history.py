@@ -152,11 +152,12 @@ class HistoryView(ctk.CTkFrame):
         hdr = ctk.CTkFrame(card, fg_color="transparent")
         hdr.pack(fill="x", padx=24, pady=(18, 16))
         month_dt = datetime.strptime(month_str, "%Y-%m")
-        title = f"{month_full(month_dt.month)} {month_dt.year}"
+        period_str = dm.get_budget_period_str(month_str)
+        title = f"{month_full(month_dt.month)} {month_dt.year} ({period_str})"
         ctk.CTkButton(
             hdr,
             text=("⌄ " if expanded else "› ") + title,
-            width=170,
+            width=240,
             height=32,
             fg_color="transparent",
             text_color=COLOR_TEXT,

@@ -118,9 +118,13 @@ def display_type(kind):
     return tx("Addition" if kind == "addition" else "Deduction")
 
 
-def month_year_label(month_str, upper=False):
+def month_year_label(month_str, upper=False, with_range=False):
     year, month = map(int, month_str.split("-"))
     label = f"{month_full(month)} {year}"
+    if with_range:
+        period = dm.get_budget_period_str(month_str)
+        if period:
+            label = f"{label} ({period})"
     return label.upper() if upper else label
 
 
@@ -189,7 +193,7 @@ class FlorinApp(ctk.CTk):
         self.config["theme"] = theme_module.set_theme(self.config.get("theme", "Petal Rose"))
         sync_theme_globals()
         set_language(self.config.get("language", "en"))
-        self.current_month = datetime.now().strftime("%Y-%m")
+        self.current_month = dm.get_current_budget_month()
         self.config["last_month"] = self.current_month
         dm.save_config(self.config)
         self.data = dm.load_month(self.current_month)

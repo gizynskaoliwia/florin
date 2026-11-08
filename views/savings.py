@@ -390,7 +390,7 @@ class SavingsView(ctk.CTkFrame):
 
         # Header row
         ctk.CTkLabel(table, text=tx("Category"), font=FONT_LABEL, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=0, column=0, padx=2, pady=2, sticky="w")
-        current_m = datetime.now().month
+        current_m = int(dm.get_current_budget_month().split("-")[1])
         for m in range(12):
             is_current = (m + 1 == current_m)
             hdr_bg = COLOR_CURRENT_MONTH if is_current else "transparent"
@@ -517,7 +517,7 @@ class SavingsView(ctk.CTkFrame):
             data = self.controller.data
             actual_grid = sp.get("actual_grid", {})
             plan_grid = sp.get("grid", {})
-            current_m = datetime.now().month
+            current_m = int(dm.get_current_budget_month().split("-")[1])
             child_widgets = []
             for i, cat in enumerate(children):
                 r = start_row + i
@@ -545,7 +545,7 @@ class SavingsView(ctk.CTkFrame):
             child_widgets = []
             sp = self.sp
             grid = sp.get("grid", {})
-            current_m = datetime.now().month
+            current_m = int(dm.get_current_budget_month().split("-")[1])
             for i, cat in enumerate(cats):
                 r = start_row + i
                 self._render_planning_cat_row(table, cat, r, grid, all_cascades, current_m)
@@ -655,7 +655,7 @@ class SavingsView(ctk.CTkFrame):
         NAME_W = 150
 
         ctk.CTkLabel(table, text=tx("Category"), font=FONT_LABEL, text_color=COLOR_TEXT, width=NAME_W, anchor="w").grid(row=0, column=0, padx=2, pady=2, sticky="w")
-        current_m = datetime.now().month
+        current_m = int(dm.get_current_budget_month().split("-")[1])
         for m in range(12):
             is_current = (m + 1 == current_m)
             hdr_bg = COLOR_CURRENT_MONTH if is_current else "transparent"

@@ -13,22 +13,31 @@ MIGRATION_NAME = "json_to_sqlite_v1"
 
 
 def needs_migration() -> bool:
-    """Check if JSON-to-SQLite migration has already been applied."""
+    """Check if any pending migration has not yet been applied."""
     conn = get_connection()
-    row = conn.execute("SELECT 1 FROM migrations WHERE name = ?", (MIGRATION_NAME,)).fetchone()
-    return row is None
+    row1 = conn.execute("SELECT 1 FROM migrations WHERE name = ?", (MIGRATION_NAME,)).fetchone()
+    row2 = conn.execute("SELECT 1 FROM migrations WHERE name = 'budget_month_start_15th_v1'").fetchone()
+    return (row1 is None) or (row2 is None)
 
 
 def run_migration():
-    """Migrate all JSON data into SQLite. Idempotent."""
-    if not needs_migration():
-        return
+    """Run all pending migrations into SQLite. Safe and idempotent."""
     conn = get_connection()
-    _migrate_config(conn)
-    _migrate_months(conn)
-    _migrate_savings(conn)
-    conn.execute("INSERT INTO migrations (name) VALUES (?)", (MIGRATION_NAME,))
-    conn.commit()
+    # Migration 1: JSON to SQLite
+    row1 = conn.execute("SELECT 1 FROM migrations WHERE name = ?", (MIGRATION_NAME,)).fetchone()
+    if row1 is None:
+        _migrate_config(conn)
+        _migrate_months(conn)
+        _migrate_savings(conn)
+        conn.execute("INSERT INTO migrations (name) VALUES (?)", (MIGRATION_NAME,))
+        conn.commit()
+
+    # Migration 2: Reassign expenses to budget month starting on 15th
+    row2 = conn.execute("SELECT 1 FROM migrations WHERE name = 'budget_month_start_15th_v1'").fetchone()
+    if row2 is None:
+        _migrate_budget_months_15th(conn)
+        conn.execute("INSERT INTO migrations (name) VALUES ('budget_month_start_15th_v1')")
+        conn.commit()
 
 
 def _migrate_config(conn):
@@ -180,3 +189,45 @@ def _migrate_savings(conn):
                 "INSERT OR REPLACE INTO savings_spent (category_id, amount) VALUES (?, ?)",
                 (cat_id, amt)
             )
+
+
+def _migrate_budget_months_15th(conn):
+    """Reassign any existing expenses so their 'month' matches date_to_budget_month(date)."""
+    from data_manager import date_to_budget_month, generate_default_month
+
+    rows = conn.execute("SELECT id, month, date FROM expenses").fetchall()
+    needed_months = set()
+
+    for r in rows:
+        exp_id = r["id"]
+        cur_month = r["month"]
+        exp_date = r["date"]
+        try:
+            target_month = date_to_budget_month(exp_date)
+        except Exception:
+            continue
+
+        if target_month and target_month != cur_month:
+            needed_months.add(target_month)
+            conn.execute("UPDATE expenses SET month = ? WHERE id = ?", (target_month, exp_id))
+
+    # Ensure all target_months exist in categories table
+    for tm in needed_months:
+        exists = conn.execute("SELECT 1 FROM categories WHERE month = ? LIMIT 1", (tm,)).fetchone()
+        if not exists:
+            def_data = generate_default_month(tm)
+            for cat in def_data.get("categories", []):
+                conn.execute(
+                    "INSERT OR REPLACE INTO categories (id, month, name, percent, color) VALUES (?, ?, ?, ?, ?)",
+                    (cat["id"], tm, cat["name"], cat.get("percent", 0), cat.get("color", "#888888"))
+                )
+            for ec in def_data.get("expense_categories", []):
+                conn.execute(
+                    "INSERT OR REPLACE INTO expense_categories (id, month, name) VALUES (?, ?, ?)",
+                    (ec["id"], tm, ec["name"])
+                )
+            for inc in def_data.get("income_items", []):
+                conn.execute(
+                    "INSERT OR REPLACE INTO income_items (id, month, name, amount, type, category_id) VALUES (?, ?, ?, ?, ?, ?)",
+                    (inc["id"], tm, inc["name"], inc.get("amount", 0.0), inc["type"], inc.get("category_id"))
+                )

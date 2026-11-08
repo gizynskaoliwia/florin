@@ -13,7 +13,8 @@
 **GUI Framework:** `customtkinter` (pip install customtkinter)
 **Platform:** Windows/macOS/Linux desktop
 **Locale:** UI in English, currency in PLN (Polish Zloty), date format DD/MM/YYYY
-**Data format:** JSON files for persistence (one file per month, stored in `./data/`)
+**Budget Period:** Starts on the 15th of the month and ends on the 14th of the following month (e.g. `2026-04` covers 15.04.2026 – 14.05.2026)
+**Data format:** SQLite database (`florin.db`) for persistence (formerly JSON files in `./data/`)
 
 ---
 

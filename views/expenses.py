@@ -39,8 +39,12 @@ class ExpensesView(ctk.CTkFrame):
         month_box = ctk.CTkFrame(self.topbar, fg_color=COLOR_SURFACE, corner_radius=RADIUS_BUTTON, border_width=1, border_color=COLOR_BORDER)
         month_box.pack(side="right", padx=8)
         ctk.CTkButton(month_box, text="‹", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(-1)).pack(side="left", padx=(4, 0), pady=3)
-        self._month_label = ctk.CTkLabel(month_box, text="", font=FONT_MONO, text_color=COLOR_TEXT, width=116)
-        self._month_label.pack(side="left")
+        mid = ctk.CTkFrame(month_box, fg_color="transparent")
+        mid.pack(side="left", padx=6, pady=2)
+        self._month_label = ctk.CTkLabel(mid, text="", font=FONT_LABEL, text_color=COLOR_TEXT)
+        self._month_label.pack(anchor="center")
+        self._month_sub_label = ctk.CTkLabel(mid, text="", font=FONT_MONO_SM, text_color=COLOR_TEXT_MUTED)
+        self._month_sub_label.pack(anchor="center")
         ctk.CTkButton(month_box, text="›", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(1)).pack(side="left", padx=(0, 4), pady=3)
         ctk.CTkFrame(self, height=1, fg_color=COLOR_BORDER).pack(fill="x")
 
@@ -95,7 +99,14 @@ class ExpensesView(ctk.CTkFrame):
         date_frame.pack(fill="x", padx=20)
         date_entry = ctk.CTkEntry(date_frame, font=FONT_BODY)
         date_entry.pack(side="left", fill="x", expand=True)
-        date_entry.insert(0, edit_exp["date"] if edit_exp else datetime.now().strftime("%d/%m/%Y"))
+        if edit_exp:
+            default_date = edit_exp["date"]
+        elif dm.is_date_in_budget_month(datetime.now(), self.controller.current_month):
+            default_date = datetime.now().strftime("%d/%m/%Y")
+        else:
+            cur_y, cur_m = map(int, self.controller.current_month.split("-"))
+            default_date = f"15/{cur_m:02d}/{cur_y:04d}"
+        date_entry.insert(0, default_date)
         date_error_lbl = ctk.CTkLabel(dialog, text="", font=FONT_SMALL, text_color=COLOR_ERROR, anchor="w")
         date_error_lbl.pack(fill="x", padx=20)
 
@@ -216,8 +227,7 @@ class ExpensesView(ctk.CTkFrame):
                 savings_cat_id = source_id
 
             # Check if moving to a different month
-            new_date = datetime.strptime(date_val, "%d/%m/%Y")
-            new_month_str = f"{new_date.year}-{new_date.month:02d}"
+            new_month_str = dm.date_to_budget_month(date_val)
 
             if new_month_str != self.controller.current_month:
                 if edit_exp:
@@ -360,6 +370,7 @@ class ExpensesView(ctk.CTkFrame):
         self.filter_month = int(month_str)
 
         self._month_label.configure(text=f"{month_full(self.filter_month).upper()} {self.filter_year}")
+        self._month_sub_label.configure(text=dm.get_budget_period_str(self.controller.current_month))
         filtered_expenses = self._visible_expenses()
 
         if self.selected_expense_id not in {e["id"] for e in filtered_expenses}:
@@ -376,11 +387,7 @@ class ExpensesView(ctk.CTkFrame):
         query = self.search_var.get().strip().lower()
 
         def in_month(exp):
-            try:
-                d = datetime.strptime(exp["date"], "%d/%m/%Y")
-                return d.month == self.filter_month and d.year == self.filter_year
-            except Exception:
-                return False
+            return dm.is_date_in_budget_month(exp.get("date", ""), self.controller.current_month)
 
         expenses = [e for e in self.controller.data.get("expenses", []) if in_month(e)]
         if self.active_tag:
@@ -409,7 +416,7 @@ class ExpensesView(ctk.CTkFrame):
             w.destroy()
         month_expenses = [
             e for e in self.controller.data.get("expenses", [])
-            if self._date_key(e).month == self.filter_month and self._date_key(e).year == self.filter_year
+            if dm.is_date_in_budget_month(e.get("date", ""), self.controller.current_month)
         ]
         self._filter_button(tx("All"), len(month_expenses), self.active_source_id is None, lambda: self.set_source_filter(None))
         for cat in dm.get_global_categories():

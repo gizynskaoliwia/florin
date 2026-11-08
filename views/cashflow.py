@@ -26,8 +26,12 @@ class CashFlowView(ctk.CTkFrame):
         month_box = ctk.CTkFrame(actions, fg_color=COLOR_SURFACE, corner_radius=RADIUS_BUTTON, border_width=1, border_color=COLOR_BORDER)
         month_box.pack(side="left", padx=(0, 10))
         ctk.CTkButton(month_box, text="‹", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(-1)).pack(side="left", padx=(4, 0), pady=3)
-        self.month_lbl = ctk.CTkLabel(month_box, text="", font=FONT_MONO, text_color=COLOR_TEXT, width=118)
-        self.month_lbl.pack(side="left")
+        mid = ctk.CTkFrame(month_box, fg_color="transparent")
+        mid.pack(side="left", padx=6, pady=2)
+        self.month_lbl = ctk.CTkLabel(mid, text="", font=FONT_LABEL, text_color=COLOR_TEXT)
+        self.month_lbl.pack(anchor="center")
+        self.month_sub_lbl = ctk.CTkLabel(mid, text="", font=FONT_MONO_SM, text_color=COLOR_TEXT_MUTED)
+        self.month_sub_lbl.pack(anchor="center")
         ctk.CTkButton(month_box, text="›", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(1)).pack(side="left", padx=(0, 4), pady=3)
         self.edit_btn = ctk.CTkButton(actions, text=ui_text("✎ Edit balances", "✎ Edytuj salda"), width=122, height=34, fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_SOFT, command=self.toggle_edit)
         self.edit_btn.pack(side="left", padx=(0, 8))
@@ -80,6 +84,7 @@ class CashFlowView(ctk.CTkFrame):
         targets = dm.get_cashflow_targets(self.controller.config)
         cf = dm.get_cashflow(data)
         self.month_lbl.configure(text=month_year_label(self.controller.current_month, upper=True))
+        self.month_sub_lbl.configure(text=dm.get_budget_period_str(self.controller.current_month))
 
         self.balance_vars = {}
         self.topup_lbls = {}
