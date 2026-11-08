@@ -184,8 +184,8 @@ class CashFlowView(ctk.CTkFrame):
             ctk.CTkLabel(title_box, text=ui_text("minimum buffer", "minimalny bufor"), font=FONT_MONO_SM_BOLD, text_color=COLOR_TEXT_MUTED).pack(anchor="w", pady=(2, 0))
 
             if self.editing:
-                ctk.CTkButton(head, text="×", width=24, height=24, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, font=(FONT_FAMILY, 14, "bold"), command=lambda t_id=tid: self.delete_target(t_id)).pack(side="right")
-                ctk.CTkButton(head, text="✎", width=24, height=24, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, font=(FONT_FAMILY, 12), command=lambda t_id=tid: self.edit_target_dialog(t_id)).pack(side="right", padx=(0, 2))
+                ctk.CTkButton(head, text="×", width=24, height=24, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, font=(FONT_BODY_FAMILY, 14, "bold"), command=lambda t_id=tid: self.delete_target(t_id)).pack(side="right")
+                ctk.CTkButton(head, text="✎", width=24, height=24, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, font=(FONT_BODY_FAMILY, 12), command=lambda t_id=tid: self.edit_target_dialog(t_id)).pack(side="right", padx=(0, 2))
 
             row_now = ctk.CTkFrame(card, fg_color="transparent")
             row_now.pack(fill="x", padx=18, pady=(2, 2))

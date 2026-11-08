@@ -172,5 +172,43 @@ class TestMonthCashflowTargets(unittest.TestCase):
                 except Exception:
                     pass
 
+    def test_cashflow_view_edit_mode_rendering(self):
+        import customtkinter as ctk
+        import views.cashflow as cf
+
+        root = ctk.CTk()
+        try:
+            month = "2026-10"
+            data = dm.load_month(month)
+
+            class Controller:
+                current_month = month
+                config = dm.get_config()
+                def __init__(self, d): self.data = d
+                def save_data(self): pass
+                def change_month(self, delta): pass
+                def show_view(self, view): pass
+
+            ctrl = Controller(data)
+            view = cf.CashFlowView(root, ctrl)
+
+            # View mode
+            view.editing = False
+            view.build()
+            self.assertEqual(len(view.balance_vars), len(data.get("cashflow_targets", [])))
+
+            # Toggle to edit mode
+            view.toggle_edit()
+            self.assertTrue(view.editing)
+            # Ensure all targets rendered in edit mode
+            self.assertEqual(len(view.balance_vars), len(data.get("cashflow_targets", [])))
+            self.assertEqual(len(view.target_vars), len(data.get("cashflow_targets", [])))
+
+            # Toggle back
+            view.toggle_edit()
+            self.assertFalse(view.editing)
+        finally:
+            root.destroy()
+
 if __name__ == "__main__":
     unittest.main()
