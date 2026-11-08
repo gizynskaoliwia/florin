@@ -39,38 +39,14 @@ def save_month(month_str: str, data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/shared_goals")
-def get_shared_goals():
-    return dm.get_shared_goals()
-
-@app.put("/api/shared_goals")
-def save_shared_goals(goals: List[Dict[str, Any]]):
-    try:
-        dm.save_shared_goals(goals)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/api/savings_planner")
-def get_savings_planner():
-    return dm.get_savings_planner()
+def get_savings_planner(year: Optional[str] = None):
+    return dm.get_savings_planner(year)
 
 @app.put("/api/savings_planner")
 def save_savings_planner(sp: Dict[str, Any]):
     try:
         dm.save_savings_planner(sp)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/emergency_fund")
-def get_emergency_fund():
-    return dm.get_emergency_fund_settings()
-
-@app.put("/api/emergency_fund/{mode}")
-def save_emergency_fund(mode: str, data: Dict[str, Any]):
-    try:
-        dm.save_emergency_fund_settings(mode, data)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

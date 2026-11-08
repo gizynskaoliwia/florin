@@ -15,7 +15,9 @@ class SavingsView(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=COLOR_BG)
         self.controller = controller
-        self.sp = dm.get_savings_planner()
+        year = getattr(self.controller, "current_month", "2026-04").split("-")[0]
+        self.sp = dm.get_savings_planner(year)
+        dm.get_savings_actual(self.sp)
         self.editing = False
         self.cell_vars = {}
         self.assumed_vars = {}
@@ -828,7 +830,7 @@ class SavingsView(ctk.CTkFrame):
         self._planning_deferred = {}
         self._actual_deferred = {}
         # Single-pass cache: scan all month files once for savings spent
-        self._spent_cache = dm.build_savings_spent_cache()
+        self._spent_cache = dm.build_savings_spent_cache(self.sp)
         year = self.controller.current_month.split("-")[0]
         self.year_lbl.configure(text=year)
         self._build_year_summary()
@@ -864,7 +866,8 @@ class SavingsView(ctk.CTkFrame):
             ctk.CTkLabel(body, text=sub, font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(anchor="w")
 
     def refresh(self):
-        self.sp = dm.get_savings_planner()
+        year = self.controller.current_month.split("-")[0]
+        self.sp = dm.get_savings_planner(year)
         dm.get_savings_actual(self.sp)
         # Default all groups to collapsed on first load
         all_group_ids = {g["id"] for g in self.sp.get("groups", [])}
@@ -880,7 +883,9 @@ class SavingsActualView(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="transparent")
         self.controller = controller
-        self.sp = dm.get_savings_planner()
+        year = getattr(self.controller, "current_month", "2026-04").split("-")[0]
+        self.sp = dm.get_savings_planner(year)
+        dm.get_savings_actual(self.sp)
         self.editing = False
         self.cell_vars = {}
         self.avail_vars = {}
@@ -1137,7 +1142,9 @@ class SavingsActualView(ctk.CTkFrame):
             self.remain_lbls[mk] = lbl
 
     def refresh(self):
-        self.sp = dm.get_savings_planner()
+        year = self.controller.current_month.split("-")[0]
+        self.sp = dm.get_savings_planner(year)
+        dm.get_savings_actual(self.sp)
         self.build_grid()
 
 

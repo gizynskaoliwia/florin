@@ -204,52 +204,64 @@ CREATE TABLE IF NOT EXISTS cashflow (
 
 -- Savings groups
 CREATE TABLE IF NOT EXISTS savings_groups (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL
+    id TEXT NOT NULL,
+    year TEXT NOT NULL,
+    name TEXT NOT NULL,
+    PRIMARY KEY (id, year)
 );
 
 -- Savings categories
 CREATE TABLE IF NOT EXISTS savings_categories (
-    id TEXT PRIMARY KEY,
+    id TEXT NOT NULL,
+    year TEXT NOT NULL,
     name TEXT NOT NULL,
     target REAL NOT NULL DEFAULT 0.0,
     deadline_month INTEGER NOT NULL DEFAULT 12,
     group_id TEXT,
-    next_year_target REAL
+    next_year_target REAL,
+    PRIMARY KEY (id, year)
 );
 
 -- Savings planning grid (planned amounts per category per month)
 CREATE TABLE IF NOT EXISTS savings_grid (
     category_id TEXT NOT NULL,
+    year TEXT NOT NULL,
     month_key TEXT NOT NULL,
     amount REAL NOT NULL DEFAULT 0.0,
-    PRIMARY KEY (category_id, month_key)
+    PRIMARY KEY (category_id, year, month_key)
 );
 
 -- Savings assumed available per month
 CREATE TABLE IF NOT EXISTS savings_assumed (
-    month_key TEXT PRIMARY KEY,
-    amount REAL NOT NULL DEFAULT 0.0
+    year TEXT NOT NULL,
+    month_key TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0.0,
+    PRIMARY KEY (year, month_key)
 );
 
 -- Savings actual grid (actual saved per category per month)
 CREATE TABLE IF NOT EXISTS savings_actual_grid (
     category_id TEXT NOT NULL,
+    year TEXT NOT NULL,
     month_key TEXT NOT NULL,
     amount REAL NOT NULL DEFAULT 0.0,
-    PRIMARY KEY (category_id, month_key)
+    PRIMARY KEY (category_id, year, month_key)
 );
 
 -- Savings actual available per month
 CREATE TABLE IF NOT EXISTS savings_actual_available (
-    month_key TEXT PRIMARY KEY,
-    amount REAL NOT NULL DEFAULT 0.0
+    year TEXT NOT NULL,
+    month_key TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0.0,
+    PRIMARY KEY (year, month_key)
 );
 
 -- Savings spent tracking
 CREATE TABLE IF NOT EXISTS savings_spent (
-    category_id TEXT PRIMARY KEY,
-    amount REAL NOT NULL DEFAULT 0.0
+    category_id TEXT NOT NULL,
+    year TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0.0,
+    PRIMARY KEY (category_id, year)
 );
 
 -- Shared goals definitions

@@ -177,6 +177,31 @@ class TestFullSystemVerification(unittest.TestCase):
         self.assertEqual(app.current_month, cur_m)
         app.destroy()
 
+    def test_07_savings_planner_year_isolation_no_duplicates(self):
+        """Verify that savings planner queries isolate categories/groups by year and have no duplicates."""
+        sp26 = dm.get_savings_planner("2026")
+        dm.get_savings_actual(sp26)
+        cat_ids26 = [c["id"] for c in sp26["categories"]]
+        cat_names26 = [c["name"] for c in sp26["categories"]]
+        group_ids26 = [g["id"] for g in sp26["groups"]]
+        self.assertEqual(len(cat_ids26), len(set(cat_ids26)), "2026 categories contain duplicate IDs")
+        self.assertEqual(len(cat_names26), len(set(cat_names26)), "2026 categories contain duplicate names")
+        self.assertEqual(len(group_ids26), len(set(group_ids26)), "2026 groups contain duplicate IDs")
+
+        sp27 = dm.get_savings_planner("2027")
+        dm.get_savings_actual(sp27)
+        cat_ids27 = [c["id"] for c in sp27["categories"]]
+        cat_names27 = [c["name"] for c in sp27["categories"]]
+        group_ids27 = [g["id"] for g in sp27["groups"]]
+        self.assertEqual(len(cat_ids27), len(set(cat_ids27)), "2027 categories contain duplicate IDs")
+        self.assertEqual(len(cat_names27), len(set(cat_names27)), "2027 categories contain duplicate names")
+        self.assertEqual(len(group_ids27), len(set(group_ids27)), "2027 groups contain duplicate IDs")
+
+        self.assertEqual(len(sp26["categories"]), 33)
+        self.assertEqual(len(sp27["categories"]), 30)
+        self.assertEqual(len(sp26["groups"]), 9)
+        self.assertEqual(len(sp27["groups"]), 9)
+
 if __name__ == "__main__":
     import os
     suite = unittest.TestLoader().loadTestsFromTestCase(TestFullSystemVerification)

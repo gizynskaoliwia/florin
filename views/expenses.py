@@ -156,7 +156,8 @@ class ExpensesView(ctk.CTkFrame):
 
         ctk.CTkLabel(dialog, text=tx("Funding Source:"), anchor="w").pack(fill="x", padx=20, pady=(10, 3))
         split_cats = dm.get_global_categories()
-        sp = dm.get_savings_planner()
+        year = getattr(self.controller, "current_month", "2026-04").split("-")[0]
+        sp = dm.get_savings_planner(year)
         sav_cats = sp.get("categories", [])
         source_options = {}
         for c in split_cats:
@@ -749,8 +750,11 @@ class ExpensesView(ctk.CTkFrame):
 
     def _source_name(self, exp):
         if exp.get("savings_category_id"):
-            sp = dm.get_savings_planner()
-            return next((display_name(c["name"]) for c in sp.get("categories", []) if c["id"] == exp["savings_category_id"]), tx("Savings"))
+            conn = dm.get_connection()
+            row = conn.execute("SELECT name FROM savings_categories WHERE id = ?", (exp["savings_category_id"],)).fetchone()
+            if row:
+                return display_name(row["name"])
+            return tx("Savings")
         split_cats = {c["id"]: c["name"] for c in dm.get_global_categories()}
         return display_name(split_cats.get(exp.get("category_id"), "Unknown"))
 

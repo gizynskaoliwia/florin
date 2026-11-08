@@ -444,32 +444,60 @@ def _default_categories():
 
 
 # --- Savings Planner ---
-def get_savings_planner():
+def get_savings_planner(year=None):
     """Load savings planner as dict (same shape as old JSON)."""
     init_env()
     conn = get_connection()
-    sp = {"year": datetime.now().year, "categories": [], "groups": [], "grid": {}, "assumed": {}}
+    if year is None:
+        year = get_current_budget_month().split("-")[0]
+    year = str(year)
+    sp = {"year": int(year) if year.isdigit() else year, "categories": [], "groups": [], "grid": {}, "assumed": {}}
 
-    # Groups
-    rows = conn.execute("SELECT id, name FROM savings_groups").fetchall()
-    sp["groups"] = [{"id": r["id"], "name": r["name"]} for r in rows]
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(savings_categories)").fetchall()]
+    has_year = "year" in cols
 
-    # Categories
-    rows = conn.execute("SELECT id, name, target, deadline_month, group_id, next_year_target FROM savings_categories").fetchall()
-    sp["categories"] = [{
-        "id": r["id"], "name": r["name"], "target": r["target"],
-        "deadline_month": r["deadline_month"], "group_id": r["group_id"],
-        "next_year_target": r["next_year_target"]
-    } for r in rows]
+    if has_year:
+        # Groups
+        rows = conn.execute("SELECT id, name FROM savings_groups WHERE year = ?", (year,)).fetchall()
+        sp["groups"] = [{"id": r["id"], "name": r["name"]} for r in rows]
 
-    # Grid
-    rows = conn.execute("SELECT category_id, month_key, amount FROM savings_grid").fetchall()
-    for r in rows:
-        sp["grid"].setdefault(r["category_id"], {})[r["month_key"]] = r["amount"]
+        # Categories
+        rows = conn.execute("SELECT id, name, target, deadline_month, group_id, next_year_target FROM savings_categories WHERE year = ?", (year,)).fetchall()
+        sp["categories"] = [{
+            "id": r["id"], "name": r["name"], "target": r["target"],
+            "deadline_month": r["deadline_month"], "group_id": r["group_id"],
+            "next_year_target": r["next_year_target"]
+        } for r in rows]
 
-    # Assumed
-    rows = conn.execute("SELECT month_key, amount FROM savings_assumed").fetchall()
-    sp["assumed"] = {r["month_key"]: r["amount"] for r in rows}
+        # Grid
+        rows = conn.execute("SELECT category_id, month_key, amount FROM savings_grid WHERE year = ?", (year,)).fetchall()
+        for r in rows:
+            sp["grid"].setdefault(r["category_id"], {})[r["month_key"]] = r["amount"]
+
+        # Assumed
+        rows = conn.execute("SELECT month_key, amount FROM savings_assumed WHERE year = ?", (year,)).fetchall()
+        sp["assumed"] = {r["month_key"]: r["amount"] for r in rows}
+    else:
+        # Groups
+        rows = conn.execute("SELECT id, name FROM savings_groups").fetchall()
+        sp["groups"] = [{"id": r["id"], "name": r["name"]} for r in rows]
+
+        # Categories
+        rows = conn.execute("SELECT id, name, target, deadline_month, group_id, next_year_target FROM savings_categories").fetchall()
+        sp["categories"] = [{
+            "id": r["id"], "name": r["name"], "target": r["target"],
+            "deadline_month": r["deadline_month"], "group_id": r["group_id"],
+            "next_year_target": r["next_year_target"]
+        } for r in rows]
+
+        # Grid
+        rows = conn.execute("SELECT category_id, month_key, amount FROM savings_grid").fetchall()
+        for r in rows:
+            sp["grid"].setdefault(r["category_id"], {})[r["month_key"]] = r["amount"]
+
+        # Assumed
+        rows = conn.execute("SELECT month_key, amount FROM savings_assumed").fetchall()
+        sp["assumed"] = {r["month_key"]: r["amount"] for r in rows}
 
     return sp
 
@@ -477,54 +505,107 @@ def get_savings_planner():
 def save_savings_planner(sp):
     """Persist savings planner dict to SQLite."""
     conn = get_connection()
+    year = str(sp.get("year", get_current_budget_month().split("-")[0]))
 
-    # Groups
-    conn.execute("DELETE FROM savings_groups")
-    for g in sp.get("groups", []):
-        conn.execute("INSERT INTO savings_groups (id, name) VALUES (?, ?)", (g["id"], g["name"]))
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(savings_categories)").fetchall()]
+    has_year = "year" in cols
 
-    # Categories
-    conn.execute("DELETE FROM savings_categories")
-    for cat in sp.get("categories", []):
-        conn.execute(
-            "INSERT INTO savings_categories (id, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?)",
-            (cat["id"], cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
-        )
+    if has_year:
+        # Groups
+        conn.execute("DELETE FROM savings_groups WHERE year = ?", (year,))
+        for g in sp.get("groups", []):
+            conn.execute("INSERT INTO savings_groups (id, year, name) VALUES (?, ?, ?)", (g["id"], year, g["name"]))
 
-    # Grid
-    conn.execute("DELETE FROM savings_grid")
-    for cat_id, months in sp.get("grid", {}).items():
-        for mk, amt in months.items():
-            if amt:
-                conn.execute("INSERT INTO savings_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
+        # Categories
+        conn.execute("DELETE FROM savings_categories WHERE year = ?", (year,))
+        for cat in sp.get("categories", []):
+            conn.execute(
+                "INSERT INTO savings_categories (id, year, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (cat["id"], year, cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
+            )
 
-    # Assumed
-    conn.execute("DELETE FROM savings_assumed")
-    for mk, amt in sp.get("assumed", {}).items():
-        if amt:
-            conn.execute("INSERT INTO savings_assumed (month_key, amount) VALUES (?, ?)", (mk, amt))
-
-    # Actual grid
-    if "actual_grid" in sp:
-        conn.execute("DELETE FROM savings_actual_grid")
-        for cat_id, months in sp["actual_grid"].items():
+        # Grid
+        conn.execute("DELETE FROM savings_grid WHERE year = ?", (year,))
+        for cat_id, months in sp.get("grid", {}).items():
             for mk, amt in months.items():
                 if amt:
-                    conn.execute("INSERT INTO savings_actual_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
+                    conn.execute("INSERT INTO savings_grid (category_id, year, month_key, amount) VALUES (?, ?, ?, ?)", (cat_id, year, mk, amt))
 
-    # Actual available
-    if "actual_available" in sp:
-        conn.execute("DELETE FROM savings_actual_available")
-        for mk, amt in sp["actual_available"].items():
+        # Assumed
+        conn.execute("DELETE FROM savings_assumed WHERE year = ?", (year,))
+        for mk, amt in sp.get("assumed", {}).items():
             if amt:
-                conn.execute("INSERT INTO savings_actual_available (month_key, amount) VALUES (?, ?)", (mk, amt))
+                conn.execute("INSERT INTO savings_assumed (year, month_key, amount) VALUES (?, ?, ?)", (year, mk, amt))
 
-    # Spent
-    if "spent" in sp:
-        conn.execute("DELETE FROM savings_spent")
-        for cat_id, amt in sp["spent"].items():
+        # Actual grid
+        if "actual_grid" in sp:
+            conn.execute("DELETE FROM savings_actual_grid WHERE year = ?", (year,))
+            for cat_id, months in sp["actual_grid"].items():
+                for mk, amt in months.items():
+                    if amt:
+                        conn.execute("INSERT INTO savings_actual_grid (category_id, year, month_key, amount) VALUES (?, ?, ?, ?)", (cat_id, year, mk, amt))
+
+        # Actual available
+        if "actual_available" in sp:
+            conn.execute("DELETE FROM savings_actual_available WHERE year = ?", (year,))
+            for mk, amt in sp["actual_available"].items():
+                if amt:
+                    conn.execute("INSERT INTO savings_actual_available (year, month_key, amount) VALUES (?, ?, ?)", (year, mk, amt))
+
+        # Spent
+        if "spent" in sp:
+            conn.execute("DELETE FROM savings_spent WHERE year = ?", (year,))
+            for cat_id, amt in sp["spent"].items():
+                if amt:
+                    conn.execute("INSERT INTO savings_spent (category_id, year, amount) VALUES (?, ?, ?)", (cat_id, year, amt))
+    else:
+        # Groups
+        conn.execute("DELETE FROM savings_groups")
+        for g in sp.get("groups", []):
+            conn.execute("INSERT INTO savings_groups (id, name) VALUES (?, ?)", (g["id"], g["name"]))
+
+        # Categories
+        conn.execute("DELETE FROM savings_categories")
+        for cat in sp.get("categories", []):
+            conn.execute(
+                "INSERT INTO savings_categories (id, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?)",
+                (cat["id"], cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
+            )
+
+        # Grid
+        conn.execute("DELETE FROM savings_grid")
+        for cat_id, months in sp.get("grid", {}).items():
+            for mk, amt in months.items():
+                if amt:
+                    conn.execute("INSERT INTO savings_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
+
+        # Assumed
+        conn.execute("DELETE FROM savings_assumed")
+        for mk, amt in sp.get("assumed", {}).items():
             if amt:
-                conn.execute("INSERT INTO savings_spent (category_id, amount) VALUES (?, ?)", (cat_id, amt))
+                conn.execute("INSERT INTO savings_assumed (month_key, amount) VALUES (?, ?)", (mk, amt))
+
+        # Actual grid
+        if "actual_grid" in sp:
+            conn.execute("DELETE FROM savings_actual_grid")
+            for cat_id, months in sp["actual_grid"].items():
+                for mk, amt in months.items():
+                    if amt:
+                        conn.execute("INSERT INTO savings_actual_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
+
+        # Actual available
+        if "actual_available" in sp:
+            conn.execute("DELETE FROM savings_actual_available")
+            for mk, amt in sp["actual_available"].items():
+                if amt:
+                    conn.execute("INSERT INTO savings_actual_available (month_key, amount) VALUES (?, ?, ?)", (mk, amt))
+
+        # Spent
+        if "spent" in sp:
+            conn.execute("DELETE FROM savings_spent")
+            for cat_id, amt in sp["spent"].items():
+                if amt:
+                    conn.execute("INSERT INTO savings_spent (category_id, amount) VALUES (?, ?, ?)", (cat_id, amt))
 
     conn.commit()
 
@@ -535,18 +616,35 @@ def get_savings_actual(sp):
     sp.setdefault("actual_grid", {})
     sp.setdefault("actual_available", {})
     sp.setdefault("spent", {})
+    year = str(sp.get("year", get_current_budget_month().split("-")[0]))
 
-    rows = conn.execute("SELECT category_id, month_key, amount FROM savings_actual_grid").fetchall()
-    for r in rows:
-        sp["actual_grid"].setdefault(r["category_id"], {})[r["month_key"]] = r["amount"]
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(savings_actual_grid)").fetchall()]
+    has_year = "year" in cols
 
-    rows = conn.execute("SELECT month_key, amount FROM savings_actual_available").fetchall()
-    for r in rows:
-        sp["actual_available"][r["month_key"]] = r["amount"]
+    if has_year:
+        rows = conn.execute("SELECT category_id, month_key, amount FROM savings_actual_grid WHERE year = ?", (year,)).fetchall()
+        for r in rows:
+            sp["actual_grid"].setdefault(r["category_id"], {})[r["month_key"]] = r["amount"]
 
-    rows = conn.execute("SELECT category_id, amount FROM savings_spent").fetchall()
-    for r in rows:
-        sp["spent"][r["category_id"]] = r["amount"]
+        rows = conn.execute("SELECT month_key, amount FROM savings_actual_available WHERE year = ?", (year,)).fetchall()
+        for r in rows:
+            sp["actual_available"][r["month_key"]] = r["amount"]
+
+        rows = conn.execute("SELECT category_id, amount FROM savings_spent WHERE year = ?", (year,)).fetchall()
+        for r in rows:
+            sp["spent"][r["category_id"]] = r["amount"]
+    else:
+        rows = conn.execute("SELECT category_id, month_key, amount FROM savings_actual_grid").fetchall()
+        for r in rows:
+            sp["actual_grid"].setdefault(r["category_id"], {})[r["month_key"]] = r["amount"]
+
+        rows = conn.execute("SELECT month_key, amount FROM savings_actual_available").fetchall()
+        for r in rows:
+            sp["actual_available"][r["month_key"]] = r["amount"]
+
+        rows = conn.execute("SELECT category_id, amount FROM savings_spent").fetchall()
+        for r in rows:
+            sp["spent"][r["category_id"]] = r["amount"]
 
     return sp
 
@@ -713,15 +811,26 @@ def get_cat_rollover(sp, cat_id, monthly_data=None, spent_cache=None):
 def build_savings_spent_cache(sp=None):
     """Single query to get total spent per savings category, split by deadline."""
     conn = get_connection()
-    # Deduplicate by ID to ensure bulletproof aggregation
-    rows = conn.execute(
-        """
-        SELECT id, savings_category_id, month, MAX(amount) as amount
-        FROM expenses
-        WHERE savings_category_id IS NOT NULL
-        GROUP BY id, savings_category_id, month
-        """
-    ).fetchall()
+    year = str(sp.get("year", "")) if sp else ""
+    if year:
+        rows = conn.execute(
+            """
+            SELECT id, savings_category_id, month, MAX(amount) as amount
+            FROM expenses
+            WHERE savings_category_id IS NOT NULL AND month LIKE ?
+            GROUP BY id, savings_category_id, month
+            """,
+            (f"{year}-%",)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, savings_category_id, month, MAX(amount) as amount
+            FROM expenses
+            WHERE savings_category_id IS NOT NULL
+            GROUP BY id, savings_category_id, month
+            """
+        ).fetchall()
     
     cat_deadlines = {c["id"]: c.get("deadline_month", 12) for c in sp.get("categories", [])} if sp else {}
     cache = {}

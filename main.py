@@ -263,8 +263,6 @@ class FlorinApp(ctk.CTk):
             ("Savings", "🌱", "nav.savings"),
             ("Cash Flow", "💧", "nav.cashflow"),
             ("History", "📅", "nav.history"),
-            ("Shared Goals", "🎯", "nav.shared_goals"),
-            ("Emergency Fund", "☂️", "nav.emergency_fund"),
         ]
 
         nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -272,10 +270,6 @@ class FlorinApp(ctk.CTk):
         self._sidebar_section_label(nav_frame, t("nav.section.main"))
         
         for name, icon, label_key in main_items:
-            if name == "Shared Goals" and self.config.get("enable_shared_goals", "true") != "true":
-                continue
-            if name == "Emergency Fund" and self.config.get("enable_emergency_fund", "false") != "true":
-                continue
             self._sidebar_nav_item(nav_frame, name, icon, t(label_key))
 
         bottom_nav = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -390,7 +384,6 @@ class FlorinApp(ctk.CTk):
         from views.dashboard import DashboardView
         from views.savings import SavingsView, SavingsActualView
         from views.settings import SettingsView
-        from views.shared_goals import SharedGoalsView
         from views.help import HelpView
         from views.income import IncomeView
         from views.expenses import ExpensesView
@@ -403,9 +396,6 @@ class FlorinApp(ctk.CTk):
         self.views["Savings"] = SavingsView(self.main_container, self)
         self.views["Cash Flow"] = CashFlowView(self.main_container, self)
         self.views["History"] = HistoryView(self.main_container, self)
-        self.views["Shared Goals"] = SharedGoalsView(self.main_container, self)
-        from views.emergency_fund import EmergencyFundView
-        self.views["Emergency Fund"] = EmergencyFundView(self.main_container, self)
         self.views["Settings"] = SettingsView(self.main_container, self)
         self.views["Help"] = HelpView(self.main_container, self)
         
