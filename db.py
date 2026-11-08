@@ -55,6 +55,12 @@ def _init_schema(conn: sqlite3.Connection):
 
     conn.executescript(SCHEMA_SQL)
     
+    # Check if initial_amount exists in savings_categories
+    cur = conn.execute("PRAGMA table_info(savings_categories)")
+    cols = [col["name"] for col in cur.fetchall()]
+    if "initial_amount" not in cols:
+        conn.execute("ALTER TABLE savings_categories ADD COLUMN initial_amount REAL NOT NULL DEFAULT 0.0")
+
     # Check if allocations column exists, if not, add it
     cur = conn.execute("PRAGMA table_info(emergency_fund_settings)")
     columns = [col["name"] for col in cur.fetchall()]
@@ -219,6 +225,7 @@ CREATE TABLE IF NOT EXISTS savings_categories (
     deadline_month INTEGER NOT NULL DEFAULT 12,
     group_id TEXT,
     next_year_target REAL,
+    initial_amount REAL NOT NULL DEFAULT 0.0,
     PRIMARY KEY (id, year)
 );
 

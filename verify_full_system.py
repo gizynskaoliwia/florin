@@ -202,6 +202,51 @@ class TestFullSystemVerification(unittest.TestCase):
         self.assertEqual(len(sp26["groups"]), 9)
         self.assertEqual(len(sp27["groups"]), 9)
 
+    def test_08_savings_starting_amount_and_year_independence(self):
+        """Verify initial_amount persistence, calculations, carryover suggestions, and category independence between years."""
+        sp27 = dm.get_savings_planner("2027")
+        sp26 = dm.get_savings_planner("2026")
+
+        # Suggestions from 2026
+        suggs = {c["name"]: dm.get_previous_year_savings_suggestion(sp27, c["id"], c["name"]) for c in sp27["categories"]}
+        valid_suggs = {k: v for k, v in suggs.items() if v}
+        self.assertGreater(len(valid_suggs), 0, "Expected suggestions from 2026 for 2027 categories")
+
+        # Independence: add a category in 2027 with initial amount
+        new_cat = dm.add_savings_category(sp27, "Test Independency 2027", target=1200.0, deadline_month=6, initial_amount=200.0)
+        self.assertEqual(new_cat["initial_amount"], 200.0)
+        self.assertEqual(sp27["grid"][new_cat["id"]]["01"], round(1000.0 / 6, 2))
+        dm.save_savings_planner(sp27)
+
+        # 2026 must be unaffected
+        sp26_reloaded = dm.get_savings_planner("2026")
+        self.assertFalse(any(c["name"] == "Test Independency 2027" for c in sp26_reloaded["categories"]))
+
+        # Calculations verification
+        saved_dl = dm.get_cat_saved_until_deadline(sp27, new_cat["id"])
+        missing = dm.get_cat_missing(sp27, new_cat["id"])
+        prog = dm.get_cat_progress(sp27, new_cat["id"])
+        self.assertEqual(saved_dl, 200.0)
+        self.assertEqual(missing, 1000.0)
+        self.assertAlmostEqual(prog, 200.0 / 1200.0)
+
+        # Deletion: cannot delete while initial_amount > 0
+        can_del, msg = dm.can_delete_savings_category(sp27, new_cat["id"])
+        self.assertFalse(can_del)
+        new_cat["initial_amount"] = 0.0
+        can_del, msg = dm.can_delete_savings_category(sp27, new_cat["id"])
+        self.assertTrue(can_del)
+        dm.delete_savings_category(sp27, new_cat["id"])
+        dm.save_savings_planner(sp27)
+
+        # Verify cross-year expense deletion rule
+        fryzjer_2026 = next((c for c in sp26["categories"] if "fryzjer" in c["name"].lower()), None)
+        if fryzjer_2026:
+            can_del_26, _ = dm.can_delete_savings_category(sp26, fryzjer_2026["id"])
+            can_del_27, _ = dm.can_delete_savings_category(sp27, fryzjer_2026["id"])
+            self.assertFalse(can_del_26)  # has expenses in 2026
+            self.assertTrue(can_del_27)   # no expenses in 2027
+
 if __name__ == "__main__":
     import os
     suite = unittest.TestLoader().loadTestsFromTestCase(TestFullSystemVerification)

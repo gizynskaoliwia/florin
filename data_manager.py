@@ -455,6 +455,7 @@ def get_savings_planner(year=None):
 
     cols = [c["name"] for c in conn.execute("PRAGMA table_info(savings_categories)").fetchall()]
     has_year = "year" in cols
+    has_initial = "initial_amount" in cols
 
     if has_year:
         # Groups
@@ -462,11 +463,13 @@ def get_savings_planner(year=None):
         sp["groups"] = [{"id": r["id"], "name": r["name"]} for r in rows]
 
         # Categories
-        rows = conn.execute("SELECT id, name, target, deadline_month, group_id, next_year_target FROM savings_categories WHERE year = ?", (year,)).fetchall()
+        cat_query = "SELECT id, name, target, deadline_month, group_id, next_year_target, initial_amount FROM savings_categories WHERE year = ?" if has_initial else "SELECT id, name, target, deadline_month, group_id, next_year_target FROM savings_categories WHERE year = ?"
+        rows = conn.execute(cat_query, (year,)).fetchall()
         sp["categories"] = [{
             "id": r["id"], "name": r["name"], "target": r["target"],
             "deadline_month": r["deadline_month"], "group_id": r["group_id"],
-            "next_year_target": r["next_year_target"]
+            "next_year_target": r["next_year_target"],
+            "initial_amount": (r["initial_amount"] if has_initial and r["initial_amount"] is not None else 0.0)
         } for r in rows]
 
         # Grid
@@ -517,12 +520,19 @@ def save_savings_planner(sp):
             conn.execute("INSERT INTO savings_groups (id, year, name) VALUES (?, ?, ?)", (g["id"], year, g["name"]))
 
         # Categories
+        has_initial = "initial_amount" in cols
         conn.execute("DELETE FROM savings_categories WHERE year = ?", (year,))
         for cat in sp.get("categories", []):
-            conn.execute(
-                "INSERT INTO savings_categories (id, year, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (cat["id"], year, cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
-            )
+            if has_initial:
+                conn.execute(
+                    "INSERT INTO savings_categories (id, year, name, target, deadline_month, group_id, next_year_target, initial_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (cat["id"], year, cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"), float(cat.get("initial_amount") or 0.0))
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO savings_categories (id, year, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (cat["id"], year, cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
+                )
 
         # Grid
         conn.execute("DELETE FROM savings_grid WHERE year = ?", (year,))
@@ -649,14 +659,16 @@ def get_savings_actual(sp):
     return sp
 
 
-def add_savings_category(sp, name, target, deadline_month=12, group_id=None, next_year_target=None):
+def add_savings_category(sp, name, target, deadline_month=12, group_id=None, next_year_target=None, initial_amount=0.0):
     cat = {
         "id": generate_id(), "name": name, "target": target,
         "deadline_month": deadline_month, "group_id": group_id, "next_year_target": next_year_target,
+        "initial_amount": float(initial_amount or 0.0),
     }
     sp["categories"].append(cat)
     months_count = deadline_month
-    monthly = round(target / months_count, 2) if months_count > 0 else 0
+    to_plan = max(0.0, target - cat["initial_amount"])
+    monthly = round(to_plan / months_count, 2) if months_count > 0 else 0
     grid_row = {f"{m:02d}": monthly if m <= deadline_month else 0.0 for m in range(1, 13)}
     if next_year_target and deadline_month < 12:
         monthly_nyt = round(next_year_target / 12, 2)
@@ -691,11 +703,19 @@ def can_delete_savings_category(sp, cat_id):
     if any(amt > 0 for amt in actual_row.values()):
         return False, "Kategoria zawiera już odłożone pieniądze (Rzeczywiste oszczędności). Przenieś je przed usunięciem."
         
-    # Check if there are any expenses tied to this category
+    cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    if cat and float(cat.get("initial_amount") or 0.0) > 0:
+        return False, "Kategoria zawiera kwotę początkową. Ustaw ją na 0 przed usunięciem."
+
+    # Check if there are any expenses tied to this category in this year
     conn = get_connection()
-    count = conn.execute("SELECT COUNT(*) FROM expenses WHERE savings_category_id = ?", (cat_id,)).fetchone()[0]
+    year = str(sp.get("year", ""))
+    if year:
+        count = conn.execute("SELECT COUNT(*) FROM expenses WHERE savings_category_id = ? AND month LIKE ?", (cat_id, f"{year}-%")).fetchone()[0]
+    else:
+        count = conn.execute("SELECT COUNT(*) FROM expenses WHERE savings_category_id = ?", (cat_id,)).fetchone()[0]
     if count > 0:
-        return False, f"Z tą kategorią powiązane są wydatki ({count}). Zmień przypisanie tych wydatków przed usunięciem."
+        return False, f"Z tą kategorią powiązane są wydatki w wybranym roku ({count}). Zmień przypisanie tych wydatków przed usunięciem."
         
     return True, ""
 
@@ -765,13 +785,50 @@ def get_actual_month_remaining(sp, month_key):
 
 
 def get_cat_total_saved(sp, cat_id):
-    return sum(sp.get("actual_grid", {}).get(cat_id, {}).values())
+    cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    initial = float(cat.get("initial_amount") or 0.0) if cat else 0.0
+    return initial + sum(sp.get("actual_grid", {}).get(cat_id, {}).values())
 
 
 def get_cat_saved_until_deadline(sp, cat_id):
     cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+    initial = float(cat.get("initial_amount") or 0.0) if cat else 0.0
     deadline = cat.get("deadline_month", 12) if cat else 12
-    return sum(v for k, v in sp.get("actual_grid", {}).get(cat_id, {}).items() if int(k) <= deadline)
+    return initial + sum(v for k, v in sp.get("actual_grid", {}).get(cat_id, {}).items() if int(k) <= deadline)
+
+
+def get_previous_year_savings_suggestion(sp, cat_id=None, cat_name=None):
+    """Calculate suggested carryover amount from previous year (post-deadline savings or leftover balance)."""
+    try:
+        current_year = int(sp.get("year", datetime.now().year))
+        prev_year = str(current_year - 1)
+        sp_prev = get_savings_planner(prev_year)
+        get_savings_actual(sp_prev)
+        
+        current_cat = next((c for c in sp.get("categories", []) if c["id"] == cat_id), None)
+        target_name = (current_cat["name"] if current_cat else (cat_name or "")).strip().lower()
+        
+        prev_cat = None
+        if cat_id:
+            prev_cat = next((c for c in sp_prev.get("categories", []) if c["id"] == cat_id), None)
+        if not prev_cat and target_name:
+            prev_cat = next((c for c in sp_prev.get("categories", []) if c["name"].strip().lower() == target_name), None)
+            
+        if not prev_cat:
+            return None
+            
+        post_dl = get_cat_saved_after_deadline(sp_prev, prev_cat["id"])
+        if post_dl > 0:
+            return prev_year, float(post_dl)
+            
+        cache = build_savings_spent_cache(sp_prev)
+        bal = get_cat_balance(sp_prev, prev_cat["id"], spent_cache=cache)
+        if bal > 0:
+            return prev_year, float(bal)
+            
+        return None
+    except Exception:
+        return None
 
 
 def get_cat_saved_after_deadline(sp, cat_id):
