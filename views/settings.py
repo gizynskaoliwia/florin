@@ -92,8 +92,30 @@ class SettingsView(ctk.CTkFrame):
 
         hdr = ctk.CTkFrame(card, fg_color="transparent")
         hdr.pack(fill="x", padx=24, pady=(24, 12))
-        ctk.CTkLabel(hdr, text=t("settings.cashflow.title"), font=FONT_SECTION, text_color=COLOR_TEXT).pack(anchor="w")
-        ctk.CTkLabel(hdr, text=t("settings.cashflow.desc"), font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(anchor="w", pady=(4, 0))
+        top_h = ctk.CTkFrame(hdr, fg_color="transparent")
+        top_h.pack(fill="x")
+        ctk.CTkLabel(top_h, text=ui_text("Default Cash-flow Targets (Templates)", "Domyślne cele przepływów (szablony)"), font=FONT_SECTION, text_color=COLOR_TEXT).pack(side="left")
+        ctk.CTkButton(
+            top_h,
+            text=ui_text("Go to Cash Flow tab →", "Przejdź do Przepływów →"),
+            width=160,
+            height=28,
+            fg_color=COLOR_PRIMARY,
+            text_color=COLOR_SURFACE,
+            hover_color=COLOR_PRIMARY_HOVER,
+            command=lambda: self.controller.show_view("Cash Flow")
+        ).pack(side="right")
+        ctk.CTkLabel(
+            hdr,
+            text=ui_text(
+                "These are default templates applied when creating new months. Month-specific buffer targets are managed directly in the Cash Flow tab.",
+                "Domyślne szablony buforów używane przy tworzeniu nowych miesięcy. Cele dla konkretnego miesiąca edytuje się i dodaje bezpośrednio w zakładce Przepływy."
+            ),
+            font=FONT_BODY,
+            text_color=COLOR_TEXT_MUTED,
+            wraplength=620,
+            justify="left",
+        ).pack(anchor="w", pady=(6, 0))
         ctk.CTkFrame(card, height=1, fg_color=COLOR_BORDER).pack(fill="x")
 
         self.targets_frame = ctk.CTkFrame(card, fg_color="transparent")
@@ -348,7 +370,7 @@ class SettingsView(ctk.CTkFrame):
             ctk.CTkButton(row, text="×", width=28, height=28, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, command=lambda iid=item["id"]: self.delete_income_item(iid)).pack(side="right", padx=5, pady=5)
             ctk.CTkFrame(self.inc_items_frame, height=1, fg_color=COLOR_BORDER).pack(fill="x")
 
-    # --- Cash Flow Targets ---
+    # --- Cash Flow Targets (Defaults for new months) ---
     def add_target(self):
         name = self.new_name.get().strip()
         try:
@@ -357,14 +379,14 @@ class SettingsView(ctk.CTkFrame):
             return
         if not name or amt <= 0:
             return
-        dm.add_cashflow_target(name, amt)
+        dm.add_default_cashflow_target(name, amt)
         self.new_name.delete(0, "end")
         self.new_target.delete(0, "end")
         self.controller.config = dm.get_config()
         self.refresh()
 
     def delete_target(self, tid):
-        dm.delete_cashflow_target(tid)
+        dm.delete_default_cashflow_target(tid)
         self.controller.config = dm.get_config()
         self.refresh()
 
@@ -375,7 +397,7 @@ class SettingsView(ctk.CTkFrame):
         except:
             return
         if name and amt > 0:
-            dm.edit_cashflow_target(tid, name=name, target_amount=amt)
+            dm.edit_default_cashflow_target(tid, name=name, target_amount=amt)
             self.controller.config = dm.get_config()
 
     def refresh(self):
@@ -383,7 +405,7 @@ class SettingsView(ctk.CTkFrame):
         self.build_settings_categories()
         for w in self.targets_frame.winfo_children():
             w.destroy()
-        targets = dm.get_cashflow_targets(self.controller.config)
+        targets = dm.get_default_cashflow_targets()
         for t in targets:
             row = ctk.CTkFrame(self.targets_frame, fg_color="transparent")
             row.pack(fill="x", pady=3)

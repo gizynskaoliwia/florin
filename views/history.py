@@ -215,7 +215,7 @@ class HistoryView(ctk.CTkFrame):
         card.grid(row=0, column=column, sticky="nsew", padx=(8, 0))
         ctk.CTkLabel(card, text=ui_text(f"Account balances · end of {month_full(month_dt.month)}", f"Salda kont · koniec: {month_full(month_dt.month)}").upper(), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).pack(anchor="w", padx=18, pady=(18, 12))
         cf = dm.get_cashflow(data)
-        targets = {target["id"]: target["name"] for target in dm.get_cashflow_targets(self.controller.config)}
+        targets = {target["id"]: target["name"] for target in (data.get("cashflow_targets") or dm.get_cashflow_targets(data))}
         total_assets = 0.0
         rows = []
         for tid, acct in cf.get("current_accounts", {}).items():

@@ -33,20 +33,19 @@ class CashFlowView(ctk.CTkFrame):
         self.month_sub_lbl = ctk.CTkLabel(mid, text="", font=FONT_MONO_SM, text_color=COLOR_TEXT_MUTED)
         self.month_sub_lbl.pack(anchor="center")
         ctk.CTkButton(month_box, text="›", width=30, height=30, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_SURFACE_2, command=lambda: self.controller.change_month(1)).pack(side="left", padx=(0, 4), pady=3)
-        self.edit_btn = ctk.CTkButton(actions, text=ui_text("✎ Edit balances", "✎ Edytuj salda"), width=122, height=34, fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_SOFT, command=self.toggle_edit)
+        self.edit_btn = ctk.CTkButton(actions, text=ui_text("✎ Edit", "✎ Edytuj"), width=100, height=34, fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_SOFT, command=self.toggle_edit)
         self.edit_btn.pack(side="left", padx=(0, 8))
-        ctk.CTkButton(
+        self.add_target_btn = ctk.CTkButton(
             actions,
-            text=ui_text("Adjust targets ↗", "Cele w ustawieniach ↗"),
-            width=136,
+            text=ui_text("+ Add buffer", "+ Dodaj bufor"),
+            width=120,
             height=34,
-            fg_color=COLOR_SURFACE,
-            text_color=COLOR_TEXT,
-            hover_color=COLOR_SURFACE_2,
-            border_width=1,
-            border_color=COLOR_BORDER,
-            command=lambda: self.controller.show_view("Settings"),
-        ).pack(side="left")
+            fg_color=COLOR_PRIMARY,
+            text_color=COLOR_SURFACE,
+            hover_color=COLOR_PRIMARY_HOVER,
+            command=self.add_target_dialog,
+        )
+        self.add_target_btn.pack(side="left")
         ctk.CTkFrame(self, height=1, fg_color=COLOR_BORDER).pack(fill="x")
 
         self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -70,10 +69,10 @@ class CashFlowView(ctk.CTkFrame):
         if self.editing:
             self.calculate()
             self.editing = False
-            self.edit_btn.configure(text=ui_text("✎ Edit balances", "✎ Edytuj salda"), fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_SOFT)
+            self.edit_btn.configure(text=ui_text("✎ Edit", "✎ Edytuj"), fg_color="transparent", text_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_SOFT)
         else:
             self.editing = True
-            self.edit_btn.configure(text="✓ Done", fg_color=COLOR_PRIMARY, text_color=COLOR_SURFACE, hover_color=COLOR_PRIMARY_HOVER)
+            self.edit_btn.configure(text=tx("✓ Done"), fg_color=COLOR_PRIMARY, text_color=COLOR_SURFACE, hover_color=COLOR_PRIMARY_HOVER)
         self.build()
 
     def build(self):
@@ -81,12 +80,16 @@ class CashFlowView(ctk.CTkFrame):
             w.destroy()
 
         data = self.controller.data
-        targets = dm.get_cashflow_targets(self.controller.config)
+        targets = data.get("cashflow_targets")
+        if targets is None:
+            targets = dm.get_cashflow_targets(data)
+            data["cashflow_targets"] = targets
         cf = dm.get_cashflow(data)
         self.month_lbl.configure(text=month_year_label(self.controller.current_month, upper=True))
         self.month_sub_lbl.configure(text=dm.get_budget_period_str(self.controller.current_month))
 
         self.balance_vars = {}
+        self.target_vars = {}
         self.topup_lbls = {}
         self.progress_bars = {}
         self.timestamp_lbls = {}
@@ -151,7 +154,10 @@ class CashFlowView(ctk.CTkFrame):
         if not targets:
             empty = make_card(cards)
             empty.grid(row=0, column=0, columnspan=3, sticky="ew")
-            ctk.CTkLabel(empty, text=ui_text("No cash-flow targets yet.", "Brak celów przepływów."), font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(anchor="w", padx=20, pady=20)
+            empty_box = ctk.CTkFrame(empty, fg_color="transparent")
+            empty_box.pack(padx=24, pady=24, fill="x")
+            ctk.CTkLabel(empty_box, text=ui_text("No buffer targets for this period yet.", "Brak celów przepływów w tym okresie."), font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(side="left")
+            ctk.CTkButton(empty_box, text=ui_text("+ Add buffer", "+ Dodaj bufor"), width=120, height=30, fg_color=COLOR_PRIMARY, text_color=COLOR_SURFACE, hover_color=COLOR_PRIMARY_HOVER, command=self.add_target_dialog).pack(side="right")
 
         cats = data.get("categories", [])
         shared_cat = next((c for c in cats if c["id"] == "shared"), None)
@@ -177,6 +183,10 @@ class CashFlowView(ctk.CTkFrame):
             ctk.CTkLabel(title_box, text=display_name(t_item["name"]), font=FONT_TITLE, text_color=COLOR_TEXT).pack(anchor="w")
             ctk.CTkLabel(title_box, text=ui_text("minimum buffer", "minimalny bufor"), font=FONT_MONO_SM_BOLD, text_color=COLOR_TEXT_MUTED).pack(anchor="w", pady=(2, 0))
 
+            if self.editing:
+                ctk.CTkButton(head, text="×", width=24, height=24, fg_color="transparent", text_color=COLOR_ERROR, hover_color=COLOR_BORDER, font=(FONT_FAMILY, 14, "bold"), command=lambda t_id=tid: self.delete_target(t_id)).pack(side="right")
+                ctk.CTkButton(head, text="✎", width=24, height=24, fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, font=(FONT_FAMILY, 12), command=lambda t_id=tid: self.edit_target_dialog(t_id)).pack(side="right", padx=(0, 2))
+
             row_now = ctk.CTkFrame(card, fg_color="transparent")
             row_now.pack(fill="x", padx=18, pady=(2, 2))
             ctk.CTkLabel(row_now, text=ui_text("Now", "Teraz"), font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="left")
@@ -189,10 +199,20 @@ class CashFlowView(ctk.CTkFrame):
                 entry.bind("<FocusOut>", lambda e, v=var, tid_=tid: self.on_balance_blur(v, tid_))
             else:
                 ctk.CTkLabel(row_now, text=format_money(balance, suffix=False), font=FONT_MONO, text_color=COLOR_TEXT).pack(side="right")
+
             row_target = ctk.CTkFrame(card, fg_color="transparent")
             row_target.pack(fill="x", padx=18, pady=(2, 8))
             ctk.CTkLabel(row_target, text=ui_text("Minimum target", "Cel minimum"), font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(side="left")
-            ctk.CTkLabel(row_target, text=format_money(target_amount, suffix=False), font=FONT_MONO, text_color=COLOR_TEXT).pack(side="right")
+            target_var = ctk.StringVar(value=f"{target_amount:.2f}")
+            self.target_vars[tid] = target_var
+            if self.editing:
+                tgt_entry = ctk.CTkEntry(row_target, textvariable=target_var, font=FONT_MONO, width=118, height=30, fg_color=COLOR_SURFACE, border_color=COLOR_BORDER, justify="right")
+                tgt_entry.pack(side="right")
+                tgt_entry.bind("<KeyRelease>", self.calculate)
+                tgt_entry.bind("<FocusOut>", lambda e, v=target_var, tid_=tid: self.on_target_blur(v, tid_))
+            else:
+                ctk.CTkLabel(row_target, text=format_money(target_amount, suffix=False), font=FONT_MONO, text_color=COLOR_TEXT).pack(side="right")
+
             ctk.CTkFrame(card, height=1, fg_color=COLOR_BORDER).pack(fill="x", padx=18, pady=(0, 10))
             topup_row = ctk.CTkFrame(card, fg_color="transparent")
             topup_row.pack(fill="x", padx=18)
@@ -293,11 +313,18 @@ class CashFlowView(ctk.CTkFrame):
             self.timestamp_lbls[tid].configure(text=f"{tx('Updated:')} {acct['updated_at']}")
         self.calculate()
 
+    def on_target_blur(self, var, tid):
+        val = var.get().replace(",", ".")
+        try:
+            var.set(f"{float(val):.2f}")
+        except:
+            pass
+        self.calculate()
+
     def calculate(self, event=None):
         try:
             data = self.controller.data
-            config = self.controller.config
-            targets = dm.get_cashflow_targets(config)
+            targets = data.get("cashflow_targets", [])
             cf = dm.get_cashflow(data)
 
             # Part 1: calculate top-ups
@@ -305,12 +332,21 @@ class CashFlowView(ctk.CTkFrame):
             for t in targets:
                 tid = t["id"]
                 var = self.balance_vars.get(tid)
-                if not var:
-                    continue
-                balance = parse_money(var.get())
                 acct = cf.setdefault("current_accounts", {}).setdefault(tid, {"balance": 0.0, "updated_at": ""})
-                acct["balance"] = balance
-                topup = max(0.0, t["target"] - balance)
+                if var:
+                    balance = parse_money(var.get())
+                    acct["balance"] = balance
+                else:
+                    balance = acct.get("balance", 0.0)
+
+                tgt_var = self.target_vars.get(tid)
+                if tgt_var:
+                    target_amount = parse_money(tgt_var.get())
+                    t["target"] = target_amount
+                else:
+                    target_amount = t.get("target", 0.0)
+
+                topup = max(0.0, target_amount - balance)
                 total_topup += topup
                 if tid in self.topup_lbls:
                     self.topup_lbls[tid].configure(
@@ -318,10 +354,11 @@ class CashFlowView(ctk.CTkFrame):
                         text_color=COLOR_PRIMARY if topup > 0 else COLOR_SUCCESS,
                     )
                 if tid in self.progress_bars:
-                    ratio = min(balance / t["target"], 1.0) if t["target"] > 0 else 1.0
+                    ratio = min(balance / target_amount, 1.0) if target_amount > 0 else 1.0
                     self.progress_bars[tid].set(ratio)
+                    self.progress_bars[tid].configure(progress_color=COLOR_PRIMARY if topup > 0 else COLOR_SUCCESS)
                 if tid in self.timestamp_lbls:
-                    ratio = min(balance / t["target"], 1.0) if t["target"] > 0 else 1.0
+                    ratio = min(balance / target_amount, 1.0) if target_amount > 0 else 1.0
                     ts_text = acct.get("updated_at", "")
                     self.timestamp_lbls[tid].configure(text=f"{int(ratio * 100)}% {ui_text('funded', 'sfinansowane')} · {ts_text or ui_text('not updated yet', 'jeszcze bez aktualizacji')}")
 
@@ -358,6 +395,119 @@ class CashFlowView(ctk.CTkFrame):
             self.controller.save_data()
         except:
             pass
+
+    def add_target_dialog(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(ui_text("Add Buffer Target", "Dodaj cel przepływu"))
+        dialog.geometry("380x320")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        period_str = dm.get_budget_period_str(self.controller.current_month)
+        ctk.CTkLabel(dialog, text=f"{ui_text('Period', 'Okres')}: {month_year_label(self.controller.current_month)} ({period_str})", font=FONT_SMALL, text_color=COLOR_PRIMARY).pack(fill="x", padx=20, pady=(15, 8))
+
+        ctk.CTkLabel(dialog, text=ui_text("Buffer Name:", "Nazwa bufora / konta:"), anchor="w").pack(fill="x", padx=20, pady=(4, 2))
+        name_e = ctk.CTkEntry(dialog)
+        name_e.pack(fill="x", padx=20)
+
+        ctk.CTkLabel(dialog, text=ui_text("Target Amount (PLN):", "Cel minimum (PLN):"), anchor="w").pack(fill="x", padx=20, pady=(10, 2))
+        target_e = ctk.CTkEntry(dialog)
+        target_e.pack(fill="x", padx=20)
+
+        ctk.CTkLabel(dialog, text=ui_text("Current Balance (optional):", "Aktualne saldo (opcjonalnie):"), anchor="w").pack(fill="x", padx=20, pady=(10, 2))
+        balance_e = ctk.CTkEntry(dialog)
+        balance_e.pack(fill="x", padx=20)
+
+        def save():
+            name = name_e.get().strip()
+            try:
+                target_val = float(target_e.get().replace(",", "."))
+            except:
+                return
+            if not name or target_val <= 0:
+                return
+            bal_val = 0.0
+            if balance_e.get().strip():
+                try:
+                    bal_val = float(balance_e.get().replace(",", "."))
+                except:
+                    pass
+            tid = str(uuid.uuid4())
+            new_item = {"id": tid, "name": name, "target": target_val}
+            self.controller.data.setdefault("cashflow_targets", []).append(new_item)
+            cf = dm.get_cashflow(self.controller.data)
+            cf.setdefault("current_accounts", {})[tid] = {
+                "balance": bal_val,
+                "updated_at": datetime.now().strftime("%d/%m/%Y %H:%M") if bal_val else ""
+            }
+            self.controller.save_data()
+            dialog.destroy()
+            self.build()
+
+        btns = ctk.CTkFrame(dialog, fg_color="transparent")
+        btns.pack(fill="x", padx=20, pady=(20, 15))
+        ctk.CTkButton(btns, text=tx("Cancel"), fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=dialog.destroy).pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ctk.CTkButton(btns, text=tx("Save"), fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER, command=save).pack(side="right", fill="x", expand=True, padx=(5, 0))
+
+    def edit_target_dialog(self, tid):
+        targets = self.controller.data.get("cashflow_targets", [])
+        t_item = next((t for t in targets if t["id"] == tid), None)
+        if not t_item:
+            return
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(ui_text("Edit Buffer Target", "Edytuj cel przepływu"))
+        dialog.geometry("380x280")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        period_str = dm.get_budget_period_str(self.controller.current_month)
+        ctk.CTkLabel(dialog, text=f"{ui_text('Period', 'Okres')}: {month_year_label(self.controller.current_month)} ({period_str})", font=FONT_SMALL, text_color=COLOR_PRIMARY).pack(fill="x", padx=20, pady=(15, 8))
+
+        ctk.CTkLabel(dialog, text=ui_text("Buffer Name:", "Nazwa bufora / konta:"), anchor="w").pack(fill="x", padx=20, pady=(4, 2))
+        name_e = ctk.CTkEntry(dialog)
+        name_e.insert(0, t_item["name"])
+        name_e.pack(fill="x", padx=20)
+
+        ctk.CTkLabel(dialog, text=ui_text("Target Amount (PLN):", "Cel minimum (PLN):"), anchor="w").pack(fill="x", padx=20, pady=(10, 2))
+        target_e = ctk.CTkEntry(dialog)
+        target_e.insert(0, f"{t_item['target']:.2f}")
+        target_e.pack(fill="x", padx=20)
+
+        def save():
+            name = name_e.get().strip()
+            try:
+                target_val = float(target_e.get().replace(",", "."))
+            except:
+                return
+            if not name or target_val <= 0:
+                return
+            t_item["name"] = name
+            t_item["target"] = target_val
+            self.controller.save_data()
+            dialog.destroy()
+            self.build()
+
+        btns = ctk.CTkFrame(dialog, fg_color="transparent")
+        btns.pack(fill="x", padx=20, pady=(20, 15))
+        ctk.CTkButton(btns, text=tx("Cancel"), fg_color="transparent", text_color=COLOR_TEXT_MUTED, hover_color=COLOR_BORDER, command=dialog.destroy).pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ctk.CTkButton(btns, text=tx("Save"), fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER, command=save).pack(side="right", fill="x", expand=True, padx=(5, 0))
+
+    def delete_target(self, tid):
+        targets = self.controller.data.get("cashflow_targets", [])
+        t_item = next((t for t in targets if t["id"] == tid), None)
+        name = t_item["name"] if t_item else ""
+        period_str = dm.get_budget_period_str(self.controller.current_month)
+        if not messagebox.askyesno(
+            ui_text("Delete target", "Usuń cel"),
+            ui_text(f"Are you sure you want to delete buffer '{name}' for period {period_str}?", f"Czy na pewno chcesz usunąć cel '{name}' dla okresu {period_str}?")
+        ):
+            return
+        self.controller.data["cashflow_targets"] = [t for t in targets if t["id"] != tid]
+        cf = dm.get_cashflow(self.controller.data)
+        if "current_accounts" in cf and tid in cf["current_accounts"]:
+            del cf["current_accounts"][tid]
+        self.controller.save_data()
+        self.build()
 
     def refresh(self):
         self.build()

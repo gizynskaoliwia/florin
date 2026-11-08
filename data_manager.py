@@ -74,12 +74,21 @@ def save_config(config):
             set_setting(key, str(value))
     if "cashflow_targets" in config:
         conn = get_connection()
-        conn.execute("DELETE FROM cashflow_targets")
-        for i, t in enumerate(config["cashflow_targets"]):
-            conn.execute(
-                "INSERT INTO cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
-                (t["id"], t["name"], t["target"], i)
-            )
+        cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
+        if "month" in cols:
+            conn.execute("DELETE FROM default_cashflow_targets")
+            for i, t in enumerate(config["cashflow_targets"]):
+                conn.execute(
+                    "INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
+                    (t["id"], t["name"], float(t["target"]), i)
+                )
+        else:
+            conn.execute("DELETE FROM cashflow_targets")
+            for i, t in enumerate(config["cashflow_targets"]):
+                conn.execute(
+                    "INSERT INTO cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
+                    (t["id"], t["name"], float(t["target"]), i)
+                )
         conn.commit()
     if "default_income_items" in config:
         conn = get_connection()
@@ -119,38 +128,134 @@ def delete_default_income_item(item_id):
 
 
 # --- Cashflow Targets ---
-def get_cashflow_targets(config=None):
+def get_default_cashflow_targets():
     conn = get_connection()
-    rows = conn.execute("SELECT id, name, target FROM cashflow_targets ORDER BY sort_order").fetchall()
+    rows = conn.execute("SELECT id, name, target FROM default_cashflow_targets ORDER BY sort_order").fetchall()
     return [{"id": r["id"], "name": r["name"], "target": r["target"]} for r in rows]
 
 
-def add_cashflow_target(name, target_amount):
+def add_default_cashflow_target(name, target_amount):
     conn = get_connection()
     tid = generate_id()
-    max_order = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM cashflow_targets").fetchone()[0]
+    max_order = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM default_cashflow_targets").fetchone()[0]
     conn.execute(
-        "INSERT INTO cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
-        (tid, name, target_amount, max_order + 1)
+        "INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
+        (tid, name, float(target_amount), max_order + 1)
     )
     conn.commit()
-    return {"id": tid, "name": name, "target": target_amount}
+    return {"id": tid, "name": name, "target": float(target_amount)}
 
 
-def edit_cashflow_target(target_id, name=None, target_amount=None):
+def edit_default_cashflow_target(target_id, name=None, target_amount=None):
     conn = get_connection()
     if name is not None:
-        conn.execute("UPDATE cashflow_targets SET name = ? WHERE id = ?", (name, target_id))
+        conn.execute("UPDATE default_cashflow_targets SET name = ? WHERE id = ?", (name, target_id))
     if target_amount is not None:
-        conn.execute("UPDATE cashflow_targets SET target = ? WHERE id = ?", (target_amount, target_id))
+        conn.execute("UPDATE default_cashflow_targets SET target = ? WHERE id = ?", (float(target_amount), target_id))
     conn.commit()
-    row = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE id = ?", (target_id,)).fetchone()
+    row = conn.execute("SELECT id, name, target FROM default_cashflow_targets WHERE id = ?", (target_id,)).fetchone()
     return {"id": row["id"], "name": row["name"], "target": row["target"]} if row else None
 
 
-def delete_cashflow_target(target_id):
+def delete_default_cashflow_target(target_id):
     conn = get_connection()
-    conn.execute("DELETE FROM cashflow_targets WHERE id = ?", (target_id,))
+    conn.execute("DELETE FROM default_cashflow_targets WHERE id = ?", (target_id,))
+    conn.commit()
+
+
+def get_cashflow_targets(config_or_data=None, month=None, data=None):
+    if data is not None and config_or_data is None:
+        config_or_data = data
+    if isinstance(config_or_data, dict):
+        if "cashflow_targets" in config_or_data and config_or_data["cashflow_targets"]:
+            return config_or_data["cashflow_targets"]
+        if "month" in config_or_data:
+            month = config_or_data["month"]
+
+    if month is None:
+        month = get_current_budget_month()
+
+    conn = get_connection()
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
+    if "month" in cols:
+        rows = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE month = ? ORDER BY sort_order", (month,)).fetchall()
+        if not rows:
+            prev = _get_previous_month_str(month)
+            rows = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE month = ? ORDER BY sort_order", (prev,)).fetchall()
+        if not rows:
+            rows = conn.execute("SELECT id, name, target FROM default_cashflow_targets ORDER BY sort_order").fetchall()
+        return [{"id": r["id"], "name": r["name"], "target": r["target"]} for r in rows]
+    else:
+        rows = conn.execute("SELECT id, name, target FROM cashflow_targets ORDER BY sort_order").fetchall()
+        return [{"id": r["id"], "name": r["name"], "target": r["target"]} for r in rows]
+
+
+def add_cashflow_target(name, target_amount, month=None, data=None):
+    tid = generate_id()
+    new_t = {"id": tid, "name": name, "target": float(target_amount)}
+    if data is not None:
+        data.setdefault("cashflow_targets", []).append(new_t)
+        month = data.get("month", month)
+    if month is None:
+        month = get_current_budget_month()
+    conn = get_connection()
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
+    if "month" in cols:
+        max_order = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM cashflow_targets WHERE month = ?", (month,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO cashflow_targets (id, month, name, target, sort_order) VALUES (?, ?, ?, ?, ?)",
+            (tid, month, name, float(target_amount), max_order + 1)
+        )
+    else:
+        max_order = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM cashflow_targets").fetchone()[0]
+        conn.execute(
+            "INSERT INTO cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
+            (tid, name, float(target_amount), max_order + 1)
+        )
+    conn.commit()
+    return new_t
+
+
+def edit_cashflow_target(target_id, name=None, target_amount=None, month=None, data=None):
+    if data is not None:
+        for t in data.get("cashflow_targets", []):
+            if t["id"] == target_id:
+                if name is not None: t["name"] = name
+                if target_amount is not None: t["target"] = float(target_amount)
+                break
+        month = data.get("month", month)
+    if month is None:
+        month = get_current_budget_month()
+    conn = get_connection()
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
+    if "month" in cols:
+        if name is not None:
+            conn.execute("UPDATE cashflow_targets SET name = ? WHERE id = ? AND month = ?", (name, target_id, month))
+        if target_amount is not None:
+            conn.execute("UPDATE cashflow_targets SET target = ? WHERE id = ? AND month = ?", (float(target_amount), target_id, month))
+        row = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE id = ? AND month = ?", (target_id, month)).fetchone()
+    else:
+        if name is not None:
+            conn.execute("UPDATE cashflow_targets SET name = ? WHERE id = ?", (name, target_id))
+        if target_amount is not None:
+            conn.execute("UPDATE cashflow_targets SET target = ? WHERE id = ?", (float(target_amount), target_id))
+        row = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE id = ?", (target_id,)).fetchone()
+    conn.commit()
+    return {"id": row["id"], "name": row["name"], "target": row["target"]} if row else None
+
+
+def delete_cashflow_target(target_id, month=None, data=None):
+    if data is not None:
+        data["cashflow_targets"] = [t for t in data.get("cashflow_targets", []) if t["id"] != target_id]
+        month = data.get("month", month)
+    if month is None:
+        month = get_current_budget_month()
+    conn = get_connection()
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
+    if "month" in cols:
+        conn.execute("DELETE FROM cashflow_targets WHERE id = ? AND month = ?", (target_id, month))
+    else:
+        conn.execute("DELETE FROM cashflow_targets WHERE id = ?", (target_id,))
     conn.commit()
 
 
@@ -344,6 +449,20 @@ def _load_month_from_db(conn, month_str):
             cashflow[r["key"]] = r["value"]
     data["cashflow"] = cashflow
 
+    # Cashflow targets
+    cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
+    if "month" in cols:
+        t_rows = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE month = ? ORDER BY sort_order", (month_str,)).fetchall()
+        if not t_rows:
+            prev = _get_previous_month_str(month_str)
+            t_rows = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE month = ? ORDER BY sort_order", (prev,)).fetchall()
+        if not t_rows:
+            t_rows = conn.execute("SELECT id, name, target FROM default_cashflow_targets ORDER BY sort_order").fetchall()
+        data["cashflow_targets"] = [{"id": r["id"], "name": r["name"], "target": r["target"]} for r in t_rows]
+    else:
+        t_rows = conn.execute("SELECT id, name, target FROM cashflow_targets ORDER BY sort_order").fetchall()
+        data["cashflow_targets"] = [{"id": r["id"], "name": r["name"], "target": r["target"]} for r in t_rows]
+
     return data
 
 
@@ -398,6 +517,18 @@ def save_month(month_str, data):
                     conn.execute("INSERT INTO cashflow (month, key, value) VALUES (?, ?, ?)", (month_str, f"acct:{acct_id}", float(acct)))
         elif isinstance(val, (int, float)):
             conn.execute("INSERT INTO cashflow (month, key, value) VALUES (?, ?, ?)", (month_str, key, float(val)))
+
+    # Cashflow targets
+    if "cashflow_targets" in data:
+        cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
+        if "month" in cols:
+            conn.execute("DELETE FROM cashflow_targets WHERE month = ?", (month_str,))
+            for i, t in enumerate(data.get("cashflow_targets", [])):
+                conn.execute(
+                    "INSERT INTO cashflow_targets (id, month, name, target, sort_order) VALUES (?, ?, ?, ?, ?)",
+                    (t["id"], month_str, t["name"], float(t.get("target", 0.0)), i)
+                )
+
     conn.commit()
     # Update last_month setting
     set_setting("last_month", month_str)
@@ -413,9 +544,11 @@ def generate_default_month(month_str):
         prev_data = _load_month_from_db(conn, prev)
         categories = prev_data.get("categories", _default_categories())
         expense_categories = prev_data.get("expense_categories", list(DEFAULT_EXPENSE_CATEGORIES))
+        cashflow_targets = [dict(t) for t in prev_data.get("cashflow_targets", [])]
     else:
         categories = _default_categories()
         expense_categories = list(DEFAULT_EXPENSE_CATEGORIES)
+        cashflow_targets = get_default_cashflow_targets()
 
     default_items = get_default_income_items()
     income_items = [
@@ -429,7 +562,8 @@ def generate_default_month(month_str):
         "categories": categories,
         "expense_categories": expense_categories,
         "expenses": [],
-        "cashflow": {"current_accounts": {}, "shared_actual": 0.0, "shared_assumed": 0.0, "saved_assumed": 0.0}
+        "cashflow": {"current_accounts": {}, "shared_actual": 0.0, "shared_assumed": 0.0, "saved_assumed": 0.0},
+        "cashflow_targets": cashflow_targets
     }
 
 

@@ -54,11 +54,20 @@ def _migrate_config(conn):
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(val)))
 
     # Cashflow targets
-    for i, t in enumerate(config.get("cashflow_targets", [])):
-        conn.execute(
-            "INSERT OR REPLACE INTO cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
-            (t["id"], t["name"], t["target"], i)
-        )
+    cur = conn.execute("PRAGMA table_info(cashflow_targets)")
+    cols = [c["name"] for c in cur.fetchall()]
+    if "month" in cols:
+        for i, t in enumerate(config.get("cashflow_targets", [])):
+            conn.execute(
+                "INSERT OR REPLACE INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
+                (t["id"], t["name"], t.get("target", 0.0), i)
+            )
+    else:
+        for i, t in enumerate(config.get("cashflow_targets", [])):
+            conn.execute(
+                "INSERT OR REPLACE INTO cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
+                (t["id"], t["name"], t.get("target", 0.0), i)
+            )
 
     # Default income items
     for i, item in enumerate(config.get("default_income_items", [])):
@@ -138,57 +147,87 @@ def _migrate_savings(conn):
         sp = json.load(f)
 
     # Groups
+    year = str(sp.get("year", "2026"))
+    cols_g = [c["name"] for c in conn.execute("PRAGMA table_info(savings_groups)").fetchall()]
+    has_year = "year" in cols_g
+    cols_c = [c["name"] for c in conn.execute("PRAGMA table_info(savings_categories)").fetchall()]
+    has_initial = "initial_amount" in cols_c
+
     for g in sp.get("groups", []):
-        conn.execute("INSERT OR REPLACE INTO savings_groups (id, name) VALUES (?, ?)", (g["id"], g["name"]))
+        if has_year:
+            conn.execute("INSERT OR REPLACE INTO savings_groups (id, year, name) VALUES (?, ?, ?)", (g["id"], year, g["name"]))
+        else:
+            conn.execute("INSERT OR REPLACE INTO savings_groups (id, name) VALUES (?, ?)", (g["id"], g["name"]))
 
     # Categories
     for cat in sp.get("categories", []):
-        conn.execute(
-            "INSERT OR REPLACE INTO savings_categories (id, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?)",
-            (cat["id"], cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
-        )
+        if has_year and has_initial:
+            conn.execute(
+                "INSERT OR REPLACE INTO savings_categories (id, year, name, target, deadline_month, group_id, next_year_target, initial_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (cat["id"], year, cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"), float(cat.get("initial_amount") or 0.0))
+            )
+        elif has_year:
+            conn.execute(
+                "INSERT OR REPLACE INTO savings_categories (id, year, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (cat["id"], year, cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
+            )
+        else:
+            conn.execute(
+                "INSERT OR REPLACE INTO savings_categories (id, name, target, deadline_month, group_id, next_year_target) VALUES (?, ?, ?, ?, ?, ?)",
+                (cat["id"], cat["name"], cat.get("target", 0), cat.get("deadline_month", 12), cat.get("group_id"), cat.get("next_year_target"))
+            )
 
     # Planning grid
+    cols_grid = [c["name"] for c in conn.execute("PRAGMA table_info(savings_grid)").fetchall()]
+    grid_has_year = "year" in cols_grid
     for cat_id, months in sp.get("grid", {}).items():
         for mk, amt in months.items():
             if amt:
-                conn.execute(
-                    "INSERT OR REPLACE INTO savings_grid (category_id, month_key, amount) VALUES (?, ?, ?)",
-                    (cat_id, mk, amt)
-                )
+                if grid_has_year:
+                    conn.execute("INSERT OR REPLACE INTO savings_grid (category_id, year, month_key, amount) VALUES (?, ?, ?, ?)", (cat_id, year, mk, amt))
+                else:
+                    conn.execute("INSERT OR REPLACE INTO savings_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
 
     # Assumed available
+    cols_assumed = [c["name"] for c in conn.execute("PRAGMA table_info(savings_assumed)").fetchall()]
+    assumed_has_year = "year" in cols_assumed
     for mk, amt in sp.get("assumed", {}).items():
         if amt:
-            conn.execute(
-                "INSERT OR REPLACE INTO savings_assumed (month_key, amount) VALUES (?, ?)",
-                (mk, amt)
-            )
+            if assumed_has_year:
+                conn.execute("INSERT OR REPLACE INTO savings_assumed (year, month_key, amount) VALUES (?, ?, ?)", (year, mk, amt))
+            else:
+                conn.execute("INSERT OR REPLACE INTO savings_assumed (month_key, amount) VALUES (?, ?)", (mk, amt))
 
     # Actual grid
+    cols_ag = [c["name"] for c in conn.execute("PRAGMA table_info(savings_actual_grid)").fetchall()]
+    ag_has_year = "year" in cols_ag
     for cat_id, months in sp.get("actual_grid", {}).items():
         for mk, amt in months.items():
             if amt:
-                conn.execute(
-                    "INSERT OR REPLACE INTO savings_actual_grid (category_id, month_key, amount) VALUES (?, ?, ?)",
-                    (cat_id, mk, amt)
-                )
+                if ag_has_year:
+                    conn.execute("INSERT OR REPLACE INTO savings_actual_grid (category_id, year, month_key, amount) VALUES (?, ?, ?, ?)", (cat_id, year, mk, amt))
+                else:
+                    conn.execute("INSERT OR REPLACE INTO savings_actual_grid (category_id, month_key, amount) VALUES (?, ?, ?)", (cat_id, mk, amt))
 
     # Actual available
+    cols_aa = [c["name"] for c in conn.execute("PRAGMA table_info(savings_actual_available)").fetchall()]
+    aa_has_year = "year" in cols_aa
     for mk, amt in sp.get("actual_available", {}).items():
         if amt:
-            conn.execute(
-                "INSERT OR REPLACE INTO savings_actual_available (month_key, amount) VALUES (?, ?)",
-                (mk, amt)
-            )
+            if aa_has_year:
+                conn.execute("INSERT OR REPLACE INTO savings_actual_available (year, month_key, amount) VALUES (?, ?, ?)", (year, mk, amt))
+            else:
+                conn.execute("INSERT OR REPLACE INTO savings_actual_available (month_key, amount) VALUES (?, ?)", (mk, amt))
 
     # Spent
+    cols_sp = [c["name"] for c in conn.execute("PRAGMA table_info(savings_spent)").fetchall()]
+    sp_has_year = "year" in cols_sp
     for cat_id, amt in sp.get("spent", {}).items():
         if amt:
-            conn.execute(
-                "INSERT OR REPLACE INTO savings_spent (category_id, amount) VALUES (?, ?)",
-                (cat_id, amt)
-            )
+            if sp_has_year:
+                conn.execute("INSERT OR REPLACE INTO savings_spent (category_id, year, amount) VALUES (?, ?, ?)", (cat_id, year, amt))
+            else:
+                conn.execute("INSERT OR REPLACE INTO savings_spent (category_id, amount) VALUES (?, ?)", (cat_id, amt))
 
 
 def _migrate_budget_months_15th(conn):

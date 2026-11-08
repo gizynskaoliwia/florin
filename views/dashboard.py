@@ -167,20 +167,37 @@ class DashboardView(ctk.CTkFrame):
             text_color=COLOR_PRIMARY,
             hover_color=COLOR_PRIMARY_SOFT,
             font=FONT_SMALL,
-            command=lambda: self.controller.show_view("Settings"),
+            command=lambda: self.controller.show_view("Cash Flow"),
         ).pack(side="right")
-        total_box = ctk.CTkFrame(buffer, fg_color=COLOR_INCOME_SOFT, corner_radius=12, border_width=1, border_color=COLOR_BORDER)
+
+        targets = self.controller.data.get("cashflow_targets")
+        if targets is None:
+            targets = dm.get_cashflow_targets(self.controller.data)
+        cf = dm.get_cashflow(self.controller.data)
+        net_income = dm.get_net_income(self.controller.data)
+        total_topup = sum(max(0.0, target.get("target", 0.0) - cf.get("current_accounts", {}).get(target["id"], {}).get("balance", 0.0)) for target in targets)
+        shared_actual = cf.get("shared_actual", 0.0)
+        actual_saved = net_income - total_topup - shared_actual
+
+        total_box = ctk.CTkFrame(buffer, fg_color=COLOR_INCOME_SOFT if actual_saved >= 0 else COLOR_EXPENSE_SOFT, corner_radius=12, border_width=1, border_color=COLOR_BORDER)
         total_box.pack(fill="x", padx=24, pady=(12, 12))
         ctk.CTkLabel(total_box, text=t("dashboard.free_savings"), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).pack(anchor="w", padx=16, pady=(12, 0))
-        ctk.CTkLabel(total_box, text=format_money(max(0, remaining), suffix=False), font=(FONT_MONO_FAMILY, 22, "bold"), text_color=COLOR_INCOME).pack(anchor="e", padx=16, pady=(0, 12))
-        for target in dm.get_cashflow_targets()[:4]:
+        ctk.CTkLabel(total_box, text=format_money(actual_saved, suffix=False), font=(FONT_MONO_FAMILY, 22, "bold"), text_color=COLOR_INCOME if actual_saved >= 0 else COLOR_ERROR).pack(anchor="e", padx=16, pady=(0, 12))
+
+        for target in targets[:4]:
+            tid = target["id"]
+            balance = cf.get("current_accounts", {}).get(tid, {}).get("balance", 0.0)
+            target_amt = target.get("target", 0.0)
+            topup = max(0.0, target_amt - balance)
+            ratio = min(balance / target_amt, 1.0) if target_amt > 0 else 1.0
+            color = COLOR_SUCCESS if topup <= 0 else COLOR_PRIMARY
             row = ctk.CTkFrame(buffer, fg_color="transparent")
             row.pack(fill="x", padx=24, pady=8)
-            ctk.CTkLabel(row, text=target["name"], font=FONT_BODY, text_color=COLOR_TEXT, anchor="w").pack(side="left")
-            ctk.CTkLabel(row, text=signed_money(target["target"]), font=FONT_MONO, text_color=COLOR_WARNING).pack(side="right")
-            progress = ctk.CTkProgressBar(buffer, height=6, progress_color=COLOR_WARNING, fg_color=COLOR_SURFACE_2)
+            ctk.CTkLabel(row, text=display_name(target["name"]), font=FONT_BODY, text_color=COLOR_TEXT, anchor="w").pack(side="left")
+            ctk.CTkLabel(row, text=f"{format_money(balance, suffix=False)} / {format_money(target_amt, suffix=False)} PLN", font=FONT_MONO, text_color=color).pack(side="right")
+            progress = ctk.CTkProgressBar(buffer, height=6, progress_color=color, fg_color=COLOR_SURFACE_2)
             progress.pack(fill="x", padx=24, pady=(0, 4))
-            progress.set(0.78)
+            progress.set(ratio)
 
         self._recent_list(total_exp)
 

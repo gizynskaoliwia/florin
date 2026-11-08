@@ -119,6 +119,61 @@ def _init_schema(conn: sqlite3.Connection):
                 (str(uuid.uuid4()), mode, today, amount)
             )
 
+    # Migrate cashflow_targets to per-month schema
+    cur = conn.execute("PRAGMA table_info(cashflow_targets)")
+    cf_cols = [col["name"] for col in cur.fetchall()]
+    if cf_cols and "month" not in cf_cols:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS default_cashflow_targets (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                target REAL NOT NULL DEFAULT 0.0,
+                sort_order INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        conn.execute("""
+            INSERT OR IGNORE INTO default_cashflow_targets (id, name, target, sort_order)
+            SELECT id, name, target, sort_order FROM cashflow_targets
+        """)
+        existing_targets = conn.execute("SELECT id, name, target, sort_order FROM cashflow_targets").fetchall()
+
+        months_rows = conn.execute("""
+            SELECT DISTINCT month FROM categories
+            UNION SELECT DISTINCT month FROM cashflow
+            UNION SELECT DISTINCT month FROM expenses
+        """).fetchall()
+        all_months = [r[0] for r in months_rows if r[0]]
+        if not all_months:
+            from datetime import datetime
+            all_months = [datetime.now().strftime("%Y-%m")]
+
+        conn.execute("""
+            CREATE TABLE cashflow_targets_new (
+                id TEXT NOT NULL,
+                month TEXT NOT NULL,
+                name TEXT NOT NULL,
+                target REAL NOT NULL DEFAULT 0.0,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (id, month)
+            )
+        """)
+        for m in all_months:
+            for t in existing_targets:
+                conn.execute(
+                    "INSERT OR IGNORE INTO cashflow_targets_new (id, month, name, target, sort_order) VALUES (?, ?, ?, ?, ?)",
+                    (t["id"], m, t["name"], t["target"], t["sort_order"])
+                )
+        conn.execute("DROP TABLE cashflow_targets")
+        conn.execute("ALTER TABLE cashflow_targets_new RENAME TO cashflow_targets")
+
+    # Seed default_cashflow_targets if empty
+    cur = conn.execute("SELECT COUNT(*) FROM default_cashflow_targets")
+    if cur.fetchone()[0] == 0:
+        import uuid
+        conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, 'Daily Life', 1500.0, 0)", (str(uuid.uuid4()),))
+        conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, 'Pleasure', 500.0, 1)", (str(uuid.uuid4()),))
+        conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, 'Business', 700.0, 2)", (str(uuid.uuid4()),))
+
 
 SCHEMA_SQL = """
 -- App settings (key-value store)
@@ -127,8 +182,18 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
--- Cashflow targets (managed in Settings)
+-- Cashflow targets (per month)
 CREATE TABLE IF NOT EXISTS cashflow_targets (
+    id TEXT NOT NULL,
+    month TEXT NOT NULL,
+    name TEXT NOT NULL,
+    target REAL NOT NULL DEFAULT 0.0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (id, month)
+);
+
+-- Default cashflow targets (templates for new months)
+CREATE TABLE IF NOT EXISTS default_cashflow_targets (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     target REAL NOT NULL DEFAULT 0.0,
