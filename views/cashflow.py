@@ -53,16 +53,12 @@ class CashFlowView(ctk.CTkFrame):
 
         self.built = False
         self.balance_vars = {}
+        self.target_vars = {}
         self.topup_lbls = {}
         self.progress_bars = {}
         self.timestamp_lbls = {}
-        self.shared_assumed_var = ctk.StringVar(value="0.00")
-        self.saved_assumed_var = ctk.StringVar(value="0.00")
-        self.shared_actual_var = ctk.StringVar(value="0.00")
-        self.saved_actual_var = ctk.StringVar(value="0.00")
         self.saved_actual_lbl = None
         self.total_topup_lbl = None
-        self.net_income_lbl = None
         self.cashflow_formula_lbl = None
 
     def toggle_edit(self):
@@ -96,9 +92,7 @@ class CashFlowView(ctk.CTkFrame):
 
         net_income = dm.get_net_income(data)
         total_topup = sum(max(0.0, target["target"] - cf.get("current_accounts", {}).get(target["id"], {}).get("balance", 0.0)) for target in targets)
-        shared_actual = cf.get("shared_actual", 0.0)
-        saved_actual = cf.get("saved_actual", 0.0)
-        actual_saved = net_income - total_topup - shared_actual
+        actual_saved = net_income - total_topup
 
         result = make_card(self.scroll, height=198)
         result.pack(fill="x", pady=(0, 22))
@@ -158,12 +152,6 @@ class CashFlowView(ctk.CTkFrame):
             empty_box.pack(padx=24, pady=24, fill="x")
             ctk.CTkLabel(empty_box, text=ui_text("No buffer targets for this period yet.", "Brak celów przepływów w tym okresie."), font=FONT_BODY, text_color=COLOR_TEXT_MUTED).pack(side="left")
             ctk.CTkButton(empty_box, text=ui_text("+ Add buffer", "+ Dodaj bufor"), width=120, height=30, fg_color=COLOR_PRIMARY, text_color=COLOR_SURFACE, hover_color=COLOR_PRIMARY_HOVER, command=self.add_target_dialog).pack(side="right")
-
-        cats = data.get("categories", [])
-        shared_cat = next((c for c in cats if c["id"] == "shared"), None)
-        saved_cat = next((c for c in cats if c["id"] == "saved"), None)
-        shared_calc = dm.get_allocated_amount(data, "shared") if shared_cat else 0.0
-        saved_calc = dm.get_allocated_amount(data, "saved") if saved_cat else 0.0
 
         for idx, t_item in enumerate(targets):
             tid = t_item["id"]
@@ -228,52 +216,6 @@ class CashFlowView(ctk.CTkFrame):
             ts_lbl = ctk.CTkLabel(card, text=f"{int(funded_ratio * 100)}% {ui_text('funded', 'sfinansowane')} · {ts_text or ui_text('not updated yet', 'jeszcze bez aktualizacji')}", font=FONT_MONO_SM_BOLD, text_color=COLOR_TEXT_MUTED)
             ts_lbl.pack(anchor="w", padx=18, pady=(0, 16))
             self.timestamp_lbls[tid] = ts_lbl
-
-        goals = make_card(self.scroll)
-        goals.pack(fill="x", pady=(0, 22))
-        goals_head = ctk.CTkFrame(goals, fg_color="transparent")
-        goals_head.pack(fill="x", padx=20, pady=(18, 12))
-        ctk.CTkLabel(goals_head, text=tx("Savings & Shared Goals"), font=FONT_TITLE, text_color=COLOR_TEXT).pack(side="left")
-        ctk.CTkLabel(goals_head, text=ui_text("calculated vs assumed", "wyliczone vs założone"), font=FONT_MONO_SM_BOLD, text_color=COLOR_TEXT_MUTED).pack(side="right")
-        ctk.CTkFrame(goals, height=1, fg_color=COLOR_BORDER).pack(fill="x")
-        goals_grid = ctk.CTkFrame(goals, fg_color="transparent")
-        goals_grid.pack(fill="x", padx=18, pady=16)
-        for idx in range(3):
-            goals_grid.grid_columnconfigure(idx, weight=1, uniform="goals")
-        self.shared_assumed_var.set(f"{cf.get('shared_assumed', 0.0):.2f}")
-        self.saved_assumed_var.set(f"{cf.get('saved_assumed', 0.0):.2f}")
-        self.shared_actual_var.set(f"{cf.get('shared_actual', 0.0):.2f}")
-        self.saved_actual_var.set(f"{cf.get('saved_actual', 0.0):.2f}")
-
-        rows = [
-            (tx("Calculated"), format_money(shared_calc, suffix=False), format_money(saved_calc, suffix=False)),
-            (tx("Assumed"), self.shared_assumed_var, self.saved_assumed_var),
-            (tx("Actual"), self.shared_actual_var, self.saved_actual_var),
-        ]
-        ctk.CTkLabel(goals_grid, text="", font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).grid(row=0, column=0, sticky="w", padx=4, pady=4)
-        ctk.CTkLabel(goals_grid, text=tx("Shared"), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).grid(row=0, column=1, sticky="ew", padx=4, pady=4)
-        ctk.CTkLabel(goals_grid, text=tx("Saved"), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).grid(row=0, column=2, sticky="ew", padx=4, pady=4)
-        for row_idx, (label, shared_val, saved_val) in enumerate(rows, start=1):
-            ctk.CTkLabel(goals_grid, text=label, font=FONT_LABEL, text_color=COLOR_TEXT, anchor="w").grid(row=row_idx, column=0, sticky="w", padx=4, pady=5)
-            if self.editing and row_idx in (2, 3):
-                shared_entry = ctk.CTkEntry(goals_grid, textvariable=shared_val, font=FONT_MONO, height=30, fg_color=COLOR_SURFACE, border_color=COLOR_BORDER, justify="center")
-                shared_entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=5)
-                shared_entry.bind("<KeyRelease>", self.calculate)
-                shared_entry.bind("<FocusOut>", lambda e: self.calculate())
-            else:
-                text = shared_val.get() if hasattr(shared_val, "get") else shared_val
-                ctk.CTkLabel(goals_grid, text=text, font=FONT_MONO, text_color=COLOR_TEXT, fg_color=COLOR_SURFACE_2, corner_radius=7, height=30).grid(row=row_idx, column=1, sticky="ew", padx=8, pady=5)
-            if saved_val is None:
-                self.net_income_lbl = ctk.CTkLabel(goals_grid, text=format_money(net_income, suffix=False), font=FONT_MONO, text_color=COLOR_INCOME, fg_color=COLOR_SURFACE_2, corner_radius=7, height=30)
-                self.net_income_lbl.grid(row=row_idx, column=2, sticky="ew", padx=8, pady=5)
-            elif self.editing and row_idx in (2, 3):
-                saved_entry = ctk.CTkEntry(goals_grid, textvariable=saved_val, font=FONT_MONO, height=30, fg_color=COLOR_SURFACE, border_color=COLOR_BORDER, justify="center")
-                saved_entry.grid(row=row_idx, column=2, sticky="ew", padx=8, pady=5)
-                saved_entry.bind("<KeyRelease>", self.calculate)
-                saved_entry.bind("<FocusOut>", lambda e: self.calculate())
-            else:
-                text = saved_val.get() if hasattr(saved_val, "get") else saved_val
-                ctk.CTkLabel(goals_grid, text=text, font=FONT_MONO, text_color=COLOR_TEXT, fg_color=COLOR_SURFACE_2, corner_radius=7, height=30).grid(row=row_idx, column=2, sticky="ew", padx=8, pady=5)
 
         recent = make_card(self.scroll)
         recent.pack(fill="x")
@@ -365,31 +307,21 @@ class CashFlowView(ctk.CTkFrame):
             if self.total_topup_lbl:
                 self.total_topup_lbl.configure(text=format_money(total_topup, suffix=False))
 
-            # Part 2: save all manual values
+            # Part 2: update calculations and save
             net_income = dm.get_net_income(data)
-            if self.net_income_lbl:
-                self.net_income_lbl.configure(text=format_money(net_income, suffix=False))
+            cf["shared_actual"] = 0.0
+            cf["saved_actual"] = 0.0
+            cf["shared_assumed"] = 0.0
+            cf["saved_assumed"] = 0.0
 
-            shared_actual = parse_money(self.shared_actual_var.get())
-            cf["shared_actual"] = shared_actual
-
-            saved_actual = parse_money(self.saved_actual_var.get())
-            cf["saved_actual"] = saved_actual
-
-            shared_assumed = parse_money(self.shared_assumed_var.get())
-            cf["shared_assumed"] = shared_assumed
-
-            saved_assumed = parse_money(self.saved_assumed_var.get())
-            cf["saved_assumed"] = saved_assumed
-
-            # Actual Saved = Net Income - Total Top-ups - Shared Actual
-            actual_saved = net_income - total_topup - shared_actual
+            # Actual Saved = Net Income - Total Top-ups
+            actual_saved = net_income - total_topup
             color = COLOR_SUCCESS if actual_saved >= 0 else COLOR_ERROR
             if self.saved_actual_lbl:
                 self.saved_actual_lbl.configure(text=format_money(actual_saved, suffix=False), text_color=color)
             if self.cashflow_formula_lbl:
                 self.cashflow_formula_lbl.configure(
-                    text=f"{ui_text('Net', 'Netto')} {format_money(net_income, suffix=False)} − {ui_text('top-ups', 'uzupełn.')} {format_money(total_topup, suffix=False)} − {ui_text('shared', 'wspólne')} {format_money(shared_actual, suffix=False)}"
+                    text=f"{ui_text('Net', 'Netto')} {format_money(net_income, suffix=False)} − {ui_text('top-ups', 'uzupełnienia')} {format_money(total_topup, suffix=False)}"
                 )
 
             self.controller.save_data()

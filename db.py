@@ -173,6 +173,39 @@ def _init_schema(conn: sqlite3.Connection):
         conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, 'Daily Life', 1500.0, 0)", (str(uuid.uuid4()),))
         conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, 'Pleasure', 500.0, 1)", (str(uuid.uuid4()),))
         conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, 'Business', 700.0, 2)", (str(uuid.uuid4()),))
+        conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES ('e5b5285f-a36b-5789-a9e8-b6e05eac3187', 'Wspólne konto wykończenie', 4800.0, 3)")
+        conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES ('6943145f-c167-5715-b8a1-0c4216645295', 'Wspólne konto', 600.0, 4)")
+        conn.execute("INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES ('88dbc084-3544-5eb7-a804-11a146d23627', 'Wspólne wesele', 200.0, 5)")
+
+    # Migration: add shared buffer targets to default templates and existing months
+    row = conn.execute("SELECT 1 FROM migrations WHERE name = 'shared_goals_to_cashflow_buffers_v1'").fetchone()
+    if not row:
+        shared_defaults = [
+            ("e5b5285f-a36b-5789-a9e8-b6e05eac3187", "Wspólne konto wykończenie", 4800.0, 3),
+            ("6943145f-c167-5715-b8a1-0c4216645295", "Wspólne konto", 600.0, 4),
+            ("88dbc084-3544-5eb7-a804-11a146d23627", "Wspólne wesele", 200.0, 5),
+        ]
+        cur = conn.execute("SELECT name FROM default_cashflow_targets")
+        existing_defs = {r["name"].lower() for r in cur.fetchall()}
+        for tid, name, target, s_order in shared_defaults:
+            if name.lower() not in existing_defs:
+                conn.execute(
+                    "INSERT INTO default_cashflow_targets (id, name, target, sort_order) VALUES (?, ?, ?, ?)",
+                    (tid, name, target, s_order)
+                )
+
+        months = [r[0] for r in conn.execute("SELECT DISTINCT month FROM cashflow_targets").fetchall()]
+        for m in months:
+            m_targets = {r["name"].lower() for r in conn.execute("SELECT name FROM cashflow_targets WHERE month = ?", (m,)).fetchall()}
+            for tid, name, target, s_order in shared_defaults:
+                if name.lower() not in m_targets:
+                    conn.execute(
+                        "INSERT INTO cashflow_targets (id, month, name, target, sort_order) VALUES (?, ?, ?, ?, ?)",
+                        (tid, m, name, target, s_order)
+                    )
+
+        conn.execute("UPDATE cashflow SET value = 0.0 WHERE key = 'shared_actual'")
+        conn.execute("INSERT OR IGNORE INTO migrations (name) VALUES ('shared_goals_to_cashflow_buffers_v1')")
 
 
 SCHEMA_SQL = """

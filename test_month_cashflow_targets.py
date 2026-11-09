@@ -42,11 +42,14 @@ class TestMonthCashflowTargets(unittest.TestCase):
 
     def test_default_cashflow_targets(self):
         defaults = dm.get_default_cashflow_targets()
-        self.assertTrue(len(defaults) >= 3)
+        self.assertTrue(len(defaults) >= 6)
         names = [d["name"] for d in defaults]
         self.assertIn("Daily Life", names)
         self.assertIn("Pleasure", names)
         self.assertIn("Business", names)
+        self.assertIn("Wspólne konto wykończenie", names)
+        self.assertIn("Wspólne konto", names)
+        self.assertIn("Wspólne wesele", names)
 
         # Add a default target
         new_def = dm.add_default_cashflow_target("Emergency Default", 3000.0)
@@ -151,18 +154,18 @@ class TestMonthCashflowTargets(unittest.TestCase):
             cols = [c["name"] for c in conn.execute("PRAGMA table_info(cashflow_targets)").fetchall()]
             self.assertIn("month", cols)
 
-            # Check that both months have all 3 targets preserved
+            # Check that both months have all 6 targets (3 legacy + 3 shared defaults)
             rows_04 = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE month = '2026-04' ORDER BY sort_order").fetchall()
-            self.assertEqual(len(rows_04), 3)
+            self.assertEqual(len(rows_04), 6)
             self.assertEqual(rows_04[0]["name"], "Daily Life")
             self.assertEqual(rows_04[0]["target"], 1500.0)
 
             rows_05 = conn.execute("SELECT id, name, target FROM cashflow_targets WHERE month = '2026-05' ORDER BY sort_order").fetchall()
-            self.assertEqual(len(rows_05), 3)
+            self.assertEqual(len(rows_05), 6)
 
             # Check default_cashflow_targets exists and has templates
             defaults = conn.execute("SELECT name, target FROM default_cashflow_targets ORDER BY sort_order").fetchall()
-            self.assertEqual(len(defaults), 3)
+            self.assertEqual(len(defaults), 6)
             self.assertEqual(defaults[0]["name"], "Daily Life")
             conn.close()
         finally:

@@ -176,15 +176,14 @@ class DashboardView(ctk.CTkFrame):
         cf = dm.get_cashflow(self.controller.data)
         net_income = dm.get_net_income(self.controller.data)
         total_topup = sum(max(0.0, target.get("target", 0.0) - cf.get("current_accounts", {}).get(target["id"], {}).get("balance", 0.0)) for target in targets)
-        shared_actual = cf.get("shared_actual", 0.0)
-        actual_saved = net_income - total_topup - shared_actual
+        actual_saved = net_income - total_topup
 
         total_box = ctk.CTkFrame(buffer, fg_color=COLOR_INCOME_SOFT if actual_saved >= 0 else COLOR_EXPENSE_SOFT, corner_radius=12, border_width=1, border_color=COLOR_BORDER)
         total_box.pack(fill="x", padx=24, pady=(12, 12))
         ctk.CTkLabel(total_box, text=t("dashboard.free_savings"), font=FONT_LABEL, text_color=COLOR_TEXT_MUTED).pack(anchor="w", padx=16, pady=(12, 0))
         ctk.CTkLabel(total_box, text=format_money(actual_saved, suffix=False), font=(FONT_MONO_FAMILY, 22, "bold"), text_color=COLOR_INCOME if actual_saved >= 0 else COLOR_ERROR).pack(anchor="e", padx=16, pady=(0, 12))
 
-        for target in targets[:4]:
+        for target in targets[:6]:
             tid = target["id"]
             balance = cf.get("current_accounts", {}).get(tid, {}).get("balance", 0.0)
             target_amt = target.get("target", 0.0)
